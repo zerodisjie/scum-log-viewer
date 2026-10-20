@@ -15,6 +15,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(BASE, "dist")
 
 # 打进包里的文件（相对 BASE）
+# assets/ 开头的是模板，运行时生成，不从这里复制
 FILES = [
     "app.py",
     "web/index.html",
@@ -22,7 +23,6 @@ FILES = [
     "web/style.css",
     "assets/start.bat",
     "assets/start-server.bat",
-    "assets/start.sh",
     "assets/README.md",
 ]
 
@@ -104,25 +104,6 @@ echo.
 pause
 """
 
-START_SH = """#!/bin/sh
-# SCUM Log Viewer {VER} - Linux / macOS
-cd "$(dirname "$0")" || exit 1
-
-PORT="${PORT:-{PORT}}"
-HOST="${HOST:-0.0.0.0}"
-
-for c in python3 python; do
-  if command -v "$c" >/dev/null 2>&1; then
-    echo "SCUM Log Viewer {VER} - listening on $HOST:$PORT (open http://127.0.0.1:$PORT/)"
-    exec "$c" app.py --host "$HOST" --port "$PORT" --no-browser "$@"
-  fi
-done
-
-echo "Python 3.9+ not found. Install it first, e.g. apt install python3"
-exit 1
-"""
-
-
 def read_version():
     with open(os.path.join(BASE, "app.py"), "r", encoding="utf-8") as f:
         m = re.search(r'^VERSION\s*=\s*"([^"]+)"', f.read(), re.M)
@@ -151,22 +132,16 @@ def build():
         shutil.copy2(src, dst)
         packed.append(rel)
 
-    # 启动脚本
-    for fname, tpl, eol in (
-        ("start.bat", START_BAT, "\r\n"),
-        ("start-server.bat", START_SERVER_BAT, "\r\n"),
-        ("start.sh", START_SH, "\n"),
+    # 启动脚本（SCUM 服务端只有 Windows，不做 Linux/macOS）
+    for fname, tpl in (
+        ("start.bat", START_BAT),
+        ("start-server.bat", START_SERVER_BAT),
     ):
-        text = tpl.replace("{VER}", ver)
-        text = text.replace("{PORT}", "8787")
-        text = text.replace("\r\n", "\n").replace("\n", eol)
+        text = tpl.replace("{VER}", ver).replace("{PORT}", "8787")
+        text = text.replace("\r\n", "\n").replace("\n", "\r\n")
         with open(os.path.join(stage, fname), "w", encoding="utf-8", newline="") as f:
             f.write(text)
         packed.append(fname)
-    try:
-        os.chmod(os.path.join(stage, "start.sh"), 0o755)
-    except OSError:
-        pass
 
     # 干净的配置 + 版本文件
     with open(os.path.join(stage, "config.json"), "w", encoding="utf-8") as f:

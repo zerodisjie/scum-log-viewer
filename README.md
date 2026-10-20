@@ -160,7 +160,6 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `web/` | 前端界面 |
 | `start.bat` | 本机模式，自动开浏览器 |
 | `start-server.bat` | 服务器模式，监听 `0.0.0.0:8787`，不开浏览器 |
-| `start.sh` | Linux / macOS 启动脚本 |
 | `config.json` | 记住上次日志目录，可删 |
 | `VERSION` | 版本号 |
 
@@ -176,16 +175,9 @@ netsh advfirewall firewall add rule name="SCUM Log Viewer" dir=in action=allow p
 
 4. 目录记不住也没关系：页面右上角「打开目录」指过去，会写进 `config.json`
 
-**Linux**
+**开机自启 / 后台常驻**
 
-```bash
-unzip SCUMLogViewer-0.1.0.zip
-chmod +x SCUMLogViewer-0.1.0/start.sh
-./SCUMLogViewer-0.1.0/start.sh --path /path/to/SCUM/Saved/SaveFiles/Logs
-# 或指定端口：PORT=9000 ./start.sh
-```
-
-长期后台跑用 `nohup` 或包一层 systemd 都行，日志目录用 `--path` 传给启动脚本。
+不想一直开着窗口，可以用任务计划程序建一个「登录时运行」的任务，程序填 `start-server.bat`，起始位置填解压目录。也可以用 [NSSM](https://nssm.cc/) 把 `python.exe app.py --host 0.0.0.0 --no-browser` 注册成 Windows 服务，开机就跑，不用登录。
 
 **安全提醒**：这个工具没有任何鉴权，`0.0.0.0` 模式下能访问到端口的人都能读全部日志（含玩家 IP 和 SteamID）。只在内网或临时测试时开，别直接暴露到公网。
 
