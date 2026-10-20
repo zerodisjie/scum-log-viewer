@@ -603,6 +603,11 @@ main {
 .detail .dv { color: var(--text-dim); font-family: ui-monospace, Consolas, monospace; }
 .detail .dv.cp { cursor: pointer; }
 .detail .dv.cp:hover { color: var(--accent); }
+.detail .tznote {
+  margin-left: 8px; padding: 0 5px; border-radius: 3px;
+  font-size: 11px; color: var(--muted); background: rgba(127, 127, 127, .14);
+  font-variant-numeric: tabular-nums;
+}
 .detail .dmsg {
   margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border);
   color: var(--text); white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace;

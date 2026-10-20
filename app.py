@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -113,7 +113,7 @@ def file_stamp(name, fallback=0):
     if m:
         y, mo, d, h, mi, s = (int(x) for x in m.groups())
         try:
-            return calendar.timegm((y, mo, d, h, mi, s, 0, 0, 0)) * 1000 + _TZ * 1000
+            return calendar.timegm((y, mo, d, h, mi, s, 0, 0, 0)) * 1000 - LOG_TZ_OFFSET * 60000
         except (ValueError, OverflowError):
             return fallback
     return fallback
@@ -212,7 +212,11 @@ def default_candidates():
 
 # ---------------------------------------------------------------- 编码与读取
 
-_TZ = time.timezone
+# SCUM 的日志时间戳（行首时间、文件名里的滚动起始时间）都是 UTC，且不带时区标记。
+# 这里统一按 UTC 换算成 epoch 毫秒，前端 new Date() 再显示成本机时区的时间。
+# 实测依据：文件最后一条记录 22:00:49 时，文件的修改时间是次日 06:00:49（东八区），恰好差 8 小时。
+# 万一将来某版日志改成本地时间，把这里改成对应分钟偏移即可（东八区 = 480）。
+LOG_TZ_OFFSET = 0
 
 
 def detect_enc(head):
@@ -299,7 +303,7 @@ def _epoch(y, mo, d, h, mi, s):
     v = _EPOCH.get(key)
     if v is None:
         try:
-            v = calendar.timegm((y, mo, d, h, mi, s, 0, 0, 0)) + _TZ
+            v = calendar.timegm((y, mo, d, h, mi, s, 0, 0, 0)) - LOG_TZ_OFFSET * 60
         except (ValueError, OverflowError):
             return None
         if len(_EPOCH) < 500000:

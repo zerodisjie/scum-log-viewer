@@ -243,6 +243,15 @@ function fmtShort(ms) {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// 日志原文里记的是 UTC，和表格里显示的本机时间会差出时区偏移，
+// 详情里附一份原始 UTC 时间，方便对着日志文件核对。
+function fmtUTC(ms) {
+  if (!ms) return "";
+  const d = d2(ms);
+  if (d.getTimezoneOffset() === 0) return "";
+  return `UTC ${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
 function fmtSize(b) {
   if (!b) return "0 B";
   if (b < 1024) return b + " B";
@@ -650,7 +659,8 @@ function showDetail(i) {
   const d = $("detail");
   d.hidden = false;
 
-  const lines = [`<div class="dr"><span class="dk">时间</span><span class="dv">${fmtFull(ts)}</span></div>`];
+  const utc = fmtUTC(ts);
+  const lines = [`<div class="dr"><span class="dk">时间</span><span class="dv">${fmtFull(ts)}${utc ? `<span class="tznote" title="日志原文用的是 UTC 时间">${utc}</span>` : ""}</span></div>`];
   lines.push(`<div class="dr"><span class="dk">类型</span><span class="dv" style="color:${tagColor(tag)}">${esc(TAG_NAME[tag] || tag)}${cat ? " · " + esc(cat) : ""}</span></div>`);
 
   // 按当前表格的列，把拆出来的字段逐条列出来

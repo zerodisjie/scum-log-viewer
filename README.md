@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/zerodisjie/scum-log-viewer)](https://github.com/zerodisjie/scum-log-viewer/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 
-版本 **v0.1.0**（本地运行，零第三方依赖，Python 3.9+）
+版本 **v0.1.1**（本地运行，零第三方依赖，Python 3.9+）
 
 本地跑的 SCUM 服务器日志阅读工具。双击启动，浏览器里看，不用装任何第三方库。
 
@@ -12,7 +12,7 @@
 双击  start-server.bat         服务器上开给局域网/远程看
 ```
 
-打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) → `SCUMLogViewer-0.1.0.zip`，解压双击 `start.bat` 就能看。
+打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) → `SCUMLogViewer-0.1.1.zip`，解压双击 `start.bat` 就能看。
 
 ---
 
@@ -97,6 +97,14 @@ SCUM 的日志是 **UTF-16LE 且不带 BOM** 的文本，行格式：
 - 没有时间戳的续行（击杀详情 JSON、声望明细等）会沿用上一条的时间，标成「续行」，顺序不会乱
 - 每个文件开头的 `Game version` 行会被跳过（每个滚动文件都有一遍，没有信息量），跳过的条数记在 `headerLines` 里
 
+## 时间与时区
+
+SCUM 日志里的时间（行首时间戳、文件名里的滚动起始时间）都是 **UTC**，且不带时区标记。工具按 UTC 解析，界面显示的是**你本机时区**的时间——东八区会比日志原文快 8 小时，这是对的，不是出错。
+
+验证方法：把某个日志文件的最后一条记录时间和文件的修改时间对一下，正好差一个时区偏移量。
+
+点开任意一条记录，详情里的时间旁边会附一份原始 `UTC` 时间，方便直接对着日志文件核对。如果你的日志确实记的是本地时间（极少见），改 `app.py` 里的 `LOG_TZ_OFFSET` 为对应分钟数即可（东八区填 480）。
+
 ## 大文件怎么处理
 
 1. 单文件超过 120MB 只读尾部
@@ -129,7 +137,7 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `app.py` | 后端：本地 HTTP 服务 + 日志解析引擎 |
 | `web/` | 前端界面（原生 HTML/CSS/JS，无构建） |
 | `启动日志查看器.bat` | 一键启动 |
-| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.0.zip`） |
+| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.1.zip`） |
 | `Logs/` | 你自己的日志目录（不在仓库里，也不会上传） |
 
 `config.json` 只是记住上次打开的目录，可以随时删。
@@ -150,9 +158,9 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 
 ---
 
-## 部署到服务器（v0.1.0）
+## 部署到服务器（v0.1.1）
 
-发行包 `SCUMLogViewer-0.1.0.zip` 解压即用，不需要 pip install：
+发行包 `SCUMLogViewer-0.1.1.zip` 解压即用，不需要 pip install：
 
 | 文件 | 用途 |
 |---|---|
