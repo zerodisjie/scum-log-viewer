@@ -1,0 +1,26 @@
+# ---- 真实服务器日志：含玩家 IP / SteamID，绝不外传 ----
+Logs/
+log/
+
+# ---- 本地测试数据 / 造数脚本，不进仓库 ----
+demo/
+make_demo.py
+
+# ---- 本地打包产物 ----
+dist/
+build/
+*.spec
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+
+# ---- 本机配置（写死了本机路径）----
+config.json
+
+# ---- 工具目录 ----
+.workbuddy/
+
+# ---- 系统垃圾 ----
+Thumbs.db
+.DS_Store
