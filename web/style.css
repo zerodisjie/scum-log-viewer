@@ -15,6 +15,21 @@
   --sel: #17293a;
   --shadow: 0 12px 32px rgba(0, 0, 0, .5);
   --row-h: 28px;
+
+  /* ---- 看板 / 大屏 ---- */
+  --glass: rgba(255, 255, 255, .034);
+  --glass-hi: rgba(255, 255, 255, .058);
+  --glass-b: rgba(255, 255, 255, .075);
+  --glass-b-hi: rgba(255, 255, 255, .14);
+  --glow-a: rgba(34, 211, 238, .13);
+  --glow-b: rgba(129, 140, 248, .10);
+  --grid: rgba(255, 255, 255, .055);
+  --kpi-up: #34d399;
+  --kpi-dn: #f87171;
+  --kpi-v: #eaf3fb;
+  --cyan: #22d3ee;
+  --violet: #a78bfa;
+  --amber: #f5a623;
 }
 
 html[data-theme="light"] {
@@ -31,6 +46,21 @@ html[data-theme="light"] {
   --hover: #eef3f9;
   --sel: #e2eefa;
   --shadow: 0 12px 32px rgba(20, 40, 70, .16);
+
+  /* 亮色下看板改成白卡 + 淡阴影，不加发光 */
+  --glass: rgba(255, 255, 255, .82);
+  --glass-hi: #ffffff;
+  --glass-b: rgba(20, 40, 70, .09);
+  --glass-b-hi: rgba(20, 40, 70, .17);
+  --glow-a: rgba(29, 111, 165, .06);
+  --glow-b: rgba(120, 80, 200, .045);
+  --grid: rgba(20, 40, 70, .075);
+  --kpi-up: #0f9d63;
+  --kpi-dn: #d94b4b;
+  --kpi-v: #0f172a;
+  --cyan: #0e7490;
+  --violet: #7c3aed;
+  --amber: #b45309;
 }
 
 /* 类型色 */
@@ -317,7 +347,8 @@ main {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--bg);
+  background: transparent;          /* 光晕从 body 透上来 */
+  position: relative;
 }
 
 .toolbar {
@@ -695,7 +726,197 @@ main {
 ::-webkit-scrollbar-thumb:hover { background: #3d4a5f; background-clip: content-box; }
 html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c3cddb; background-clip: content-box; }
 
+/* ============ 背景光晕（暗色下才有存在感，亮色主题的变量本身就很淡） ============ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(880px 500px at 10% -10%, var(--glow-a), transparent 60%),
+    radial-gradient(720px 460px at 92% 2%, var(--glow-b), transparent 58%),
+    radial-gradient(700px 420px at 50% 112%, var(--glow-a), transparent 62%);
+}
+.topbar, main { position: relative; z-index: 1; }
+
+/* ============ 服务器总览大屏 ============ */
+.logpane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* display:flex 会盖掉 [hidden] 自带的 display:none，必须显式写回来 */
+.logpane[hidden] { display: none; }
+
+.dash {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  background: transparent;          /* 让 body 的光晕透上来 */
+}
+.dash[hidden] { display: none; }
+
+.dash-head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.dash-title { display: flex; align-items: center; gap: 9px; font-size: 17px; font-weight: 700; }
+.dash-title .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--kpi-up);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, .16);
+}
+.dash-sub { font-size: 11.5px; color: var(--muted); }
+.dash-head .spacer { flex: 1; }
+
+/* ---- KPI 卡 ---- */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px;
+}
+.kpi {
+  position: relative;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-b);
+  background: linear-gradient(160deg, var(--glass-hi), var(--glass));
+  overflow: hidden;
+  transition: .18s;
+}
+.kpi:hover { border-color: var(--glass-b-hi); transform: translateY(-1px); }
+.kpi::before {
+  content: "";
+  position: absolute; left: 14px; right: 14px; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: .45;
+}
+.kpi .kk { font-size: 11px; color: var(--muted); letter-spacing: .03em; }
+.kpi .kv {
+  margin-top: 4px;
+  font-size: 25px; font-weight: 700; line-height: 1.15;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--kpi-v);
+}
+.kpi .kv small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+.kpi .ks { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+.kpi.cy { border-color: rgba(34, 211, 238, .26); }
+.kpi.cy .kv { color: var(--cyan); }
+.kpi.vi .kv { color: var(--violet); }
+.kpi.am .kv { color: var(--amber); }
+.kpi.up .kv { color: var(--kpi-up); }
+.kpi.dn .kv { color: var(--kpi-dn); }
+
+/* ---- 面板 ---- */
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+  gap: 13px;
+  align-items: start;
+}
+.panels-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 13px;
+}
+.panel {
+  border: 1px solid var(--glass-b);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--glass-hi), var(--glass));
+  padding: 12px 14px 14px;
+  min-width: 0;
+}
+.panel-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 11px; }
+.panel-h .pt { font-size: 12.5px; font-weight: 600; }
+.panel-h .ph { font-size: 10.5px; color: var(--muted); }
+
+/* ---- 趋势图 ---- */
+/* 用 viewBox 比例缩放，不变形（preserveAspectRatio 保持默认） */
+.spark { width: 100%; height: auto; display: block; overflow: visible; }
+.spark .grid line { stroke: var(--grid); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.spark .area { fill: url(#sparkFill); }
+.spark .line { fill: none; stroke: var(--cyan); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spark .dot { fill: var(--cyan); }
+.spark .lbl { fill: var(--muted); font-size: 10px; }
+.spark .hit { fill: transparent; cursor: default; }
+.spark .hit:hover { fill: rgba(34, 211, 238, .10); }
+
+/* ---- 排行榜 ---- */
+.rank { display: flex; flex-direction: column; gap: 8px; }
+.rank-row { display: flex; align-items: center; gap: 9px; }
+.rank-i {
+  width: 17px; flex: none; text-align: center;
+  font-size: 10.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rank-i.top { color: var(--amber); font-weight: 700; }
+.rank-n {
+  width: 92px; flex: none; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rank-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--border-soft); overflow: hidden; }
+.rank-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.rank-v {
+  width: 54px; flex: none; text-align: right;
+  font-size: 11.5px; color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 金额块 ---- */
+.money { display: flex; gap: 12px; margin-bottom: 11px; }
+.money-cell {
+  flex: 1; padding: 8px 11px; border-radius: 10px;
+  border: 1px solid var(--glass-b); background: var(--glass);
+}
+.money-cell .mk { font-size: 10.5px; color: var(--muted); }
+.money-cell .mv {
+  font-size: 19px; font-weight: 700;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.money-cell .mv.in { color: var(--kpi-up); }
+.money-cell .mv.out { color: var(--kpi-dn); }
+
+/* ---- 标签云 ---- */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagx {
+  padding: 3px 9px; border-radius: 999px; font-size: 11px;
+  border: 1px solid var(--glass-b); background: var(--glass);
+  color: var(--text-dim);
+}
+.tagx b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.dash-note { font-size: 10.5px; color: var(--muted); line-height: 1.6; }
+
+/* ---- 日志页顶部指标带 ---- */
+.statbar {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.stat {
+  flex: 1;
+  min-width: 100px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-b);
+  background: linear-gradient(160deg, var(--glass-hi), var(--glass));
+}
+.stat .sk { font-size: 10px; color: var(--muted); letter-spacing: .03em; white-space: nowrap; }
+.stat .sv {
+  margin-top: 1px;
+  font-size: 16px; font-weight: 700; line-height: 1.25;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--kpi-v);
+}
+.stat .sv.err { color: var(--c-error); }
+.stat .sv.dim { color: var(--text-dim); font-size: 13px; }
+
 @media (max-width: 1100px) {
   main { grid-template-columns: 200px minmax(0, 1fr); }
   .inspector { display: none; }
+  .panels { grid-template-columns: minmax(0, 1fr); }
 }

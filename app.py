@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -1283,6 +1283,7 @@ def _build(files, ftype, t0, truncated_flag):
         "last": last,
         "parseMs": int((time.time() - t0) * 1000),
         "players": plist[:80],
+        "playerTotal": len(plist),
         "stats": {"types": st_types, "levels": st_levels, "groups": st_groups},
     }
     return {"lines": rows, "meta": meta}
@@ -1391,6 +1392,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(api_open(q))
             if p == "/api/query":
                 return self._json(api_query(q))
+            if p == "/api/overview":
+                return self._json(api_overview(q))
             if p == "/api/remember":
                 remember(type=_clean_type(q.get("type")))
                 return self._json({"ok": True})
@@ -1451,7 +1454,8 @@ def _counts_or_none(root):
 
 def _clean_type(t):
     """只收已知的日志类型名，别把乱七八糟的字符串写进配置"""
-    return t if t and (t == ALL_TYPE or t in LOG_TYPES) else None
+    # __dash__ 是「服务器总览」大屏，不是日志类型，但一样要能被记住
+    return t if t and (t == ALL_TYPE or t in LOG_TYPES or t == "__dash__") else None
 
 
 def api_init(q):
@@ -1477,6 +1481,141 @@ def api_init(q):
         "candidates": cands,
         "groups": list_groups(root, _counts_or_none(root)) if root else [],
         "home": os.path.expanduser("~"),
+    }
+
+
+DAY = 86400000
+HOUR = 3600000
+
+
+def _trend(lines, first, last):
+    """把整条时间线切成桶：跨度小按小时，跨度大按天"""
+    if first is None or last is None:
+        return {"step": "day", "ms": DAY, "buckets": []}
+    span = last - first
+    step = HOUR if span <= 2 * DAY else DAY
+    start = first - (first % step)
+    n = int((last - start) // step) + 1
+    if n > 400:                      # 桶太多就并成更粗的粒度，别让图挤成一团
+        step *= 4
+        start = first - (first % step)
+        n = int((last - start) // step) + 1
+    slots = [0] * n
+    for r in lines:
+        ts = r[0]
+        if not ts:
+            continue
+        i = int((ts - start) // step)
+        if 0 <= i < n:
+            slots[i] += 1
+    return {"step": "hour" if step == HOUR else "day", "ms": step,
+            "buckets": [{"t": start + i * step, "n": slots[i]} for i in range(n)]}
+
+
+def _econ_summary(root):
+    """经济流水：进出金额、最活跃的交易商、最常交易的物品"""
+    try:
+        e = load_group(root, "economy")
+    except Exception:
+        return {"deals": 0, "in": 0, "out": 0, "top": [], "items": []}
+    lines = e["lines"]
+    cash_in = cash_out = 0
+    traders, items, players = {}, {}, {}
+    for r in lines:
+        f = r[9] or {}
+        amt = f.get("amount_n") or 0
+        d = f.get("dir")
+        if d == "in":
+            cash_in += amt
+        elif d == "out":
+            cash_out += amt
+        t = f.get("target") or ""
+        if t and t not in ("本人账户",) and not t.startswith("账号"):
+            traders[t] = traders.get(t, 0) + 1
+        nm = f.get("name") or ""
+        if nm:
+            players[nm] = players.get(nm, 0) + amt
+        for it in (f.get("items") or []):
+            key = it.get("n") or it.get("raw") or "?"
+            items[key] = items.get(key, 0) + (it.get("q") or 1)
+    return {
+        "deals": len(lines),
+        "in": cash_in, "out": cash_out,
+        "top": sorted(({"k": k, "v": v} for k, v in traders.items()),
+                      key=lambda x: -x["v"])[:5],
+        "items": sorted(({"k": k, "v": v} for k, v in items.items()),
+                        key=lambda x: -x["v"])[:6],
+        "players": sorted(({"k": k, "v": v} for k, v in players.items()),
+                          key=lambda x: -x["v"])[:5],
+    }
+
+
+def api_overview(q):
+    """服务器总览看板：一屏看清这台服务器这段时间的状况"""
+    kind, root, _ftype = _target(q)
+    if kind != "group":
+        return {"error": "缺少参数"}
+    if not os.path.isdir(root):
+        return {"error": "日志目录不存在"}
+
+    all_e = load_group(root, ALL_TYPE)
+    meta = all_e["meta"]
+    lines = all_e["lines"]
+    first, last = meta["first"], meta["last"]
+
+    # 活跃度：最近 24 小时有动静的玩家
+    recent = set()
+    if last:
+        for r in lines:
+            if r[0] and last - r[0] <= DAY and r[6]:
+                recent.add(r[6])
+
+    # 登录登出
+    logins = logouts = 0
+    try:
+        for r in load_group(root, "login")["lines"]:
+            if r[1] == "logout":
+                logouts += 1
+            else:
+                logins += 1
+    except Exception:
+        pass
+
+    # 风险：违规条数 + 错误级日志
+    violations = 0
+    try:
+        violations = len(load_group(root, "violations")["lines"])
+    except Exception:
+        pass
+    kills = 0
+    try:
+        kills = len(load_group(root, "kill")["lines"])
+    except Exception:
+        pass
+
+    groups = [{"type": k, "name": type_name(k), "count": v}
+              for k, v in (meta["stats"].get("groups") or {}).items()]
+    groups.sort(key=lambda x: -x["count"])
+
+    players = [{"id": p["id"], "name": p["name"], "count": p["count"], "last": p["last"]}
+               for p in meta["players"][:10]]
+
+    return {
+        "root": root,
+        "fileCount": meta["fileCount"],
+        "size": meta["size"],
+        "parseMs": meta["parseMs"],
+        "first": first, "last": last, "days": meta["days"],
+        "logs": meta["count"],
+        "playerTotal": meta.get("playerTotal", len(meta["players"])),
+        "levels": meta["stats"].get("levels") or {},
+        "groups": groups,
+        "players": players,
+        "active24h": len(recent),
+        "logins": logins, "logouts": logouts,
+        "kills": kills, "violations": violations,
+        "trend": _trend(lines, first, last),
+        "economy": _econ_summary(root),
     }
 
 

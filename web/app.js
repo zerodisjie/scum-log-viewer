@@ -333,6 +333,7 @@ function setRoot(path, groups, wantType) {
   // 指定了类型就打开它，否则直接进「全部日志」总时间线
   if (wantType) {
     const t = wantType.toLowerCase();
+    if (t === DASH) return openDash();
     const g = t === "all" ? null : S.groups.find((x) => x.type.toLowerCase() === t);
     if (g) return openGroup(g);
   }
@@ -341,6 +342,20 @@ function setRoot(path, groups, wantType) {
 
 /* ---------------- 侧栏：类型按钮（不再列文件） ---------------- */
 const ALL = "all";
+const DASH = "__dash__";          // 服务器总览大屏（不是一种日志类型）
+
+function dashBtn() {
+  const on = S.cur && S.cur.type === DASH;
+  const b = el("button", "typebtn all" + (on ? " active" : ""));
+  b.innerHTML = `
+    <span class="dot" style="background:var(--cyan)"></span>
+    <span class="tname">服务器总览</span>
+    <span class="trange"></span>
+    <span class="tcount">看板</span>`;
+  b.title = "一屏看清这台服务器的整体状况";
+  b.onclick = () => openDash();
+  return b;
+}
 
 function typeBtn(g, totalCount) {
   const on = S.cur && S.cur.type === g.type;
@@ -380,6 +395,7 @@ function renderGroups() {
     stampLast: alive.length ? Math.max(...alive.map((g) => g.stampLast)) : 0,
   };
 
+  box.appendChild(dashBtn());
   box.appendChild(typeBtn(allRange, totalCount));
 
   if (alive.length) {
@@ -399,6 +415,9 @@ function openGroup(g) {
 }
 
 async function open(target) {
+  if (target.kind === "group" && target.type === DASH) return openDash();
+  $("dash").hidden = true;
+  $("logPane").hidden = false;
   S.busy = true;
   S.cur = target;
   // 记住这次看的是哪一类，下次启动（包括换了新版本）直接回到这里
@@ -432,6 +451,187 @@ async function open(target) {
   }
 }
 
+/* ---------------- 服务器总览大屏 ---------------- */
+async function openDash() {
+  if (S.busy) return;
+  S.busy = true;
+  S.cur = { kind: "group", type: DASH, typeName: "服务器总览" };
+  api("/api/remember?type=" + encodeURIComponent(DASH)).catch(() => {});
+  renderGroups();
+  $("logPane").hidden = true;
+  $("dash").hidden = false;
+  $("dash").innerHTML = '<div class="dash-note">正在汇总…</div>';
+  try {
+    const d = await api("/api/overview?root=" + encodeURIComponent(S.root));
+    if (d.error) throw new Error(d.error);
+    S.dash = d;
+    renderDash(d);
+  } catch (e) {
+    $("dash").innerHTML = `<div class="dash-note">汇总失败：${esc(e.message)}</div>`;
+  } finally {
+    S.busy = false;
+  }
+}
+
+function kpi(cls, k, v, sub, unit) {
+  return `<div class="kpi ${cls || ""}">
+    <div class="kk">${esc(k)}</div>
+    <div class="kv">${v}${unit ? `<small>${esc(unit)}</small>` : ""}</div>
+    <div class="ks">${esc(sub || "")}</div></div>`;
+}
+
+function rankRow(i, name, val, max, color) {
+  const w = max ? Math.max(3, (val / max) * 100) : 0;
+  return `<div class="rank-row">
+    <span class="rank-i${i < 3 ? " top" : ""}">${i + 1}</span>
+    <span class="rank-n" title="${esc(name)}">${esc(name)}</span>
+    <span class="rank-bar"><span class="rank-fill" style="width:${w.toFixed(1)}%;background:${color}"></span></span>
+    <span class="rank-v">${val.toLocaleString()}</span></div>`;
+}
+
+function sparkSvg(trend) {
+  const bs = (trend && trend.buckets) || [];
+  if (!bs.length) return '<div class="dash-note">没有带时间戳的记录</div>';
+  const W = 800, H = 156, PL = 36, PR = 10, PT = 12, PB = 22;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const max = Math.max(...bs.map((b) => b.n), 1);
+  const px = (i) => PL + (bs.length === 1 ? iw / 2 : (iw * i) / (bs.length - 1));
+  const py = (v) => PT + ih * (1 - v / max);
+
+  const line = bs.map((b, i) => `${i ? "L" : "M"}${px(i).toFixed(1)},${py(b.n).toFixed(1)}`).join(" ");
+  const area = `${line} L${px(bs.length - 1).toFixed(1)},${(PT + ih).toFixed(1)} L${px(0).toFixed(1)},${(PT + ih).toFixed(1)} Z`;
+
+  // 网格 + 左侧刻度
+  let grid = "";
+  for (let g = 0; g <= 3; g++) {
+    const v = (max / 3) * g;
+    const y = py(v);
+    grid += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W - PR}" y2="${y.toFixed(1)}"/>`
+         + `<text class="lbl" x="${PL - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+
+  // X 轴：首 / 中 / 尾
+  const pick = bs.length === 1 ? [0] : [0, Math.floor((bs.length - 1) / 2), bs.length - 1];
+  let axis = "";
+  for (const i of pick) {
+    axis += `<text class="lbl" x="${px(i).toFixed(1)}" y="${H - 5}" text-anchor="${
+      i === 0 ? "start" : i === bs.length - 1 ? "end" : "middle"}">${
+      esc(trend.step === "hour" ? fmtTime(bs[i].t) : fmtDay(bs[i].t))}</text>`;
+  }
+
+  // 悬停热区
+  const bw = bs.length > 1 ? iw / (bs.length - 1) : iw;
+  let hits = "";
+  for (let i = 0; i < bs.length; i++) {
+    const t = bs[i].t;
+    const lbl = trend.step === "hour" ? `${fmtDay(t)} ${fmtTime(t)}` : fmtDay(t);
+    hits += `<rect class="hit" x="${(px(i) - bw / 2).toFixed(1)}" y="${PT}" width="${Math.max(bw, 2).toFixed(1)}" height="${ih}"><title>${esc(lbl)} · ${bs[i].n.toLocaleString()} 条</title></rect>`;
+  }
+
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--cyan)" stop-opacity=".30"/>
+      <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
+    </linearGradient></defs>
+    <g class="grid">${grid}</g>
+    <path class="area" d="${area}"/>
+    <path class="line" d="${line}" vector-effect="non-scaling-stroke"/>
+    ${axis}
+    ${hits}
+  </svg>`;
+}
+
+function renderDash(d) {
+  const lv = d.levels || {};
+  const err = lv.error || 0;
+  const warn = lv.warn || 0;
+  const risk = (d.violations || 0) + err;
+  const ec = d.economy || {};
+  const sizeMb = (d.size || 0) / 1048576;
+
+  const head = `<div class="dash-head">
+    <div class="dash-title"><span class="dot"></span>服务器总览</div>
+    <div class="dash-sub">${d.first ? `${fmtShort(d.first)} → ${fmtShort(d.last)}` : "无时间戳"}
+      · 覆盖 ${d.days || 0} 天 · ${d.fileCount || 0} 个文件 · ${sizeMb.toFixed(1)} MB</div>
+    <div class="spacer"></div>
+    <button class="btn small" id="dashRefresh">重新汇总</button>
+  </div>`;
+
+  const kpis = `<div class="kpis">
+    ${kpi("cy", "日志总量", d.logs.toLocaleString(), `${d.days || 0} 天 · ${d.fileCount || 0} 个文件`)}
+    ${kpi("vi", "活跃玩家", (d.playerTotal || 0).toLocaleString(), `最近 24 小时 ${d.active24h || 0} 人有动静`, "人")}
+    ${kpi("", "登录 / 登出", `${d.logins || 0}<span style="color:var(--muted);font-size:14px"> / ${d.logouts || 0}</span>`, "进服次数")}
+    ${kpi("up", "玩家收入", "+" + (ec.in || 0).toLocaleString(), `${ec.deals || 0} 笔交易 · 支出 ${(ec.out || 0).toLocaleString()}`)}
+    ${kpi("am", "击杀", (d.kills || 0).toLocaleString(), d.kills ? "有战斗记录" : "这段时间没有击杀记录")}
+    ${kpi("dn", "风险告警", risk.toLocaleString(), `违规 ${d.violations || 0} · 错误 ${err}`)}
+  </div>`;
+
+  // 类型分布
+  const gs = (d.groups || []).slice(0, 8);
+  const gmax = Math.max(...gs.map((g) => g.count), 1);
+  const groups = `<div class="panel">
+    <div class="panel-h"><span class="pt">类型分布</span><span class="ph">点一下跳到该类型</span></div>
+    <div class="rank">${gs.map((g, i) => {
+      const w = (g.count / gmax) * 100;
+      return `<div class="rank-row" data-gtype="${esc(g.type)}" style="cursor:pointer">
+        <span class="rank-i${i < 3 ? " top" : ""}">${i + 1}</span>
+        <span class="rank-n" title="${esc(g.name)}">${esc(g.name)}</span>
+        <span class="rank-bar"><span class="rank-fill" style="width:${w.toFixed(1)}%;background:${tagColor(g.type)}"></span></span>
+        <span class="rank-v">${g.count.toLocaleString()}</span></div>`;
+    }).join("") || '<div class="dash-note">没有数据</div>'}</div>
+  </div>`;
+
+  const trend = `<div class="panel">
+    <div class="panel-h"><span class="pt">日志量趋势</span><span class="ph">按${(d.trend && d.trend.step) === "hour" ? "小时" : "天"}统计 · 悬停看具体条数</span></div>
+    ${sparkSvg(d.trend)}
+  </div>`;
+
+  // 活跃玩家
+  const ps = (d.players || []).slice(0, 8);
+  const pmax = Math.max(...ps.map((p) => p.count), 1);
+  const players = `<div class="panel">
+    <div class="panel-h"><span class="pt">活跃玩家</span><span class="ph">按日志出现次数</span></div>
+    <div class="rank">${ps.map((p, i) =>
+      rankRow(i, p.name || p.id, p.count, pmax, "var(--c-login)")).join("") || '<div class="dash-note">没有数据</div>'}</div>
+  </div>`;
+
+  // 经济
+  const econ = `<div class="panel">
+    <div class="panel-h"><span class="pt">经济流水</span><span class="ph">${ec.deals || 0} 笔</span></div>
+    <div class="money">
+      <div class="money-cell"><div class="mk">卖出收入</div><div class="mv in">+${(ec.in || 0).toLocaleString()}</div></div>
+      <div class="money-cell"><div class="mk">买入 / 服务支出</div><div class="mv out">-${(ec.out || 0).toLocaleString()}</div></div>
+    </div>
+    <div class="panel-h" style="margin:2px 0 7px"><span class="ph">交易商热度</span></div>
+    <div class="rank">${(ec.top || []).map((t, i) =>
+      rankRow(i, t.k, t.v, Math.max(...(ec.top || [{ v: 1 }]).map((x) => x.v), 1), "var(--c-economy)")).join("")
+      || '<div class="dash-note">这段时间没有交易</div>'}</div>
+  </div>`;
+
+  // 交易物品
+  const items = `<div class="panel">
+    <div class="panel-h"><span class="pt">交易热点</span><span class="ph">按数量</span></div>
+    <div class="tags">${(ec.items || []).map((t) =>
+      `<span class="tagx">${esc(t.k)} <b>${t.v.toLocaleString()}</b></span>`).join("")
+      || '<span class="dash-note">这段时间没有交易物品</span>'}</div>
+    <div class="dash-note" style="margin-top:11px">
+      现金、银行存款、金条是三笔独立的钱，详细的逐笔明细在左侧「经济交易」。
+    </div>
+  </div>`;
+
+  $("dash").innerHTML = head + kpis +
+    `<div class="panels">${trend}${groups}</div>` +
+    `<div class="panels-3">${players}${econ}${items}</div>`;
+
+  $("dashRefresh").onclick = () => openDash();
+  for (const row of $("dash").querySelectorAll("[data-gtype]")) {
+    row.onclick = () => {
+      const g = S.groups.find((x) => x.type === row.dataset.gtype);
+      if (g) openGroup(g);
+    };
+  }
+}
+
 function openParams() {
   if (!S.cur) return "";
   if (S.cur.kind === "group") {
@@ -453,10 +653,32 @@ function setLogHead() {
 
 function applyMeta(meta) {
   S.meta = meta;
+  renderStatBar();
   renderCards();
   renderTypeBars();
   renderPlayers();
   renderChips();
+}
+
+/* ---------------- 日志页顶部指标带 ---------------- */
+function renderStatBar() {
+  const m = S.meta;
+  const box = $("statBar");
+  if (!m) { box.innerHTML = ""; return; }
+  const lv = (m.stats && m.stats.levels) || {};
+  const err = lv.error || 0;
+  const warn = lv.warn || 0;
+  const range = m.first ? `${fmtShort(m.first)} → ${fmtShort(m.last)}` : "无时间戳";
+  const stat = (k, v, cls) =>
+    `<div class="stat"><div class="sk">${esc(k)}</div><div class="sv ${cls || ""}">${v}</div></div>`;
+
+  box.innerHTML =
+    stat("当前视图", esc(m.typeName || "—"), "dim") +
+    stat("记录条数", (m.count || 0).toLocaleString()) +
+    stat("覆盖天数", (m.days || 0) + " 天") +
+    stat("涉及玩家", (m.playerTotal || (m.players || []).length || 0).toLocaleString()) +
+    stat("错误 / 警告", `${err} / ${warn}`, err ? "err" : "") +
+    stat("时间范围", esc(range), "dim");
 }
 
 /* ---------------- 查询 ---------------- */
