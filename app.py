@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -430,12 +430,21 @@ RE_ECON_AMT = re.compile(
     r"(?:amount|value|price|sum|cost|fee|total)\s*[:=]?\s*(-?\d[\d,]*(?:\.\d+)?)"
     r"|(-?\d[\d,]*(?:\.\d+)?)\s*(?:\$|usd|bucks|cash|scum\s*cash)"
     r"|\b(?:for|of|deposited|withdrew|transferred|paid|received|spent|worth|"
-    r"reward|bonus|refund|fine|penalt\w*|earned|gained)\s+(-?\d[\d,]*(?:\.\d+)?)",
+    r"reward|bonus|refund|fine|penalt\w*|earned|gained)\w*\s+(-?\d[\d,]*(?:\.\d+)?)",
     re.I)
 RE_ECON_ITEM = re.compile(
     r"(?:destroyed|created|issued|unlocked|locked|deleted|added|removed|"
     r"purchased|bought|sold|received|took|used)\s+(?:a|an|the)?\s*"
     r"([A-Z0-9][^,]{1,60}?)\s*(?:belonging|from|to|for|at|,|$)", re.I)
+# 交易后余额：SCUM 部分版本/日志级别会打印 "New balance: 12345"
+RE_ECON_BAL = re.compile(
+    r"\b(?:new|current|remaining|updated|old|previous)?\s*balance\b"
+    r"[^0-9\-]{0,12}(-?\d[\d,]*(?:\.\d+)?)", re.I)
+# 交易对象：to Player01(ID:7656...) / to Account Number:718... / received ... from X(ID:...)
+RE_ECON_TARGET = re.compile(
+    r"\b(?:to|towards?|into|from)\s+"
+    r"(?:Account\s*Number\s*:?\s*(?P<acc>\d{6,})"
+    r"|(?P<who>[A-Za-z][\w' \-]{1,28}?)\s*\(ID:(?P<steam>\d{17})\))", re.I)
 RE_ECON_QUOTED = re.compile(r"'([^']{2,60})'|\"([^\"]{2,60})\"")
 
 # 经济日志的行为分类：从上到下第一条命中即用
@@ -496,8 +505,35 @@ ECON_ACT_DESC = {
     "销毁物品": "销毁物品",
 }
 
+# 「对方」列没有明确对手时的方向性说明（不编造具体对象）
+ECON_TARGET_DESC = {
+    "存款": "本人账户",
+    "取款": "本人账户",
+    "开卡": "本人账户",
+    "删除卡片": "本人账户",
+    "锁定卡片": "本人账户",
+    "解锁卡片": "本人账户",
+    "还款": "银行",
+    "贷款": "银行",
+    "退款": "银行",
+    "罚金": "系统",
+    "奖励": "系统",
+    "收入": "系统",
+    "支出": "系统",
+}
+
 RE_ECON_MERCHANT = re.compile(r"\bat\s+([A-Za-z][\w' .\-]{1,40}?)\s*(?:,|$)", re.I)
 RE_ECON_PEER = re.compile(r"\b(?:to|from|with)\s+([A-Za-z][\w' \-]{1,28}?)\s*\(ID:(\d{17})\)")
+
+
+def _fmt_num(raw):
+    """12345 -> 12,345；带小数点就原样"""
+    raw = (raw or "").strip().replace(",", "")
+    try:
+        n = float(raw)
+    except ValueError:
+        return ""
+    return "{:,}".format(int(n)) if n == int(n) else "{:,}".format(n)
 
 
 def _zh_item(item):
@@ -513,7 +549,7 @@ def _zh_item(item):
 
 
 def _f_econ(txt, steam, name):
-    """经济交易：拆出玩家、账号、行为、金额、物品、关联账号"""
+    """经济交易：拆出玩家、行为、物品、交易对象、金额、交易后余额"""
     txt = re.sub(r"^\[[^\]]{1,24}\]\s*", "", txt)   # 有些行把 [Bank] 留在正文里
     f = {"name": name or "", "steam": steam or "", "detail": txt}
     m = RE_ECON_ACTOR.match(txt) or RE_ECON_ACC_ONLY.match(txt)
@@ -530,6 +566,15 @@ def _f_econ(txt, steam, name):
     phrase = re.split(r",?\s*at\s+X=", rest)[0].strip().strip(",")
     f["detail"] = phrase or rest
 
+    # 余额先从句子里摘出去：不然 "new balance 5000" 会被金额规则当成交易额
+    amt_text = phrase
+    bal = RE_ECON_BAL.search(phrase)
+    if bal:
+        v = _fmt_num(bal.group(1))
+        if v:
+            f["balance"] = v
+        amt_text = phrase[:bal.start()] + " " + phrase[bal.end():]
+
     for rx, label in ECON_RULES:
         if rx.search(phrase):
             f["act"] = label
@@ -537,20 +582,16 @@ def _f_econ(txt, steam, name):
     else:
         f["act"] = "其他"
 
-    am = RE_ECON_AMT.search(phrase)
+    am = RE_ECON_AMT.search(amt_text)
     if am:
         try:
-            raw = next(g for g in am.groups() if g)
-            f["amount"] = "{:,}".format(int(float(raw.replace(",", "")))) \
-                if "." not in raw else raw
-        except (StopIteration, ValueError):
+            v = _fmt_num(next(g for g in am.groups() if g))
+            if v:
+                f["amount"] = v
+        except StopIteration:
             pass
 
-    other = RE_ECON_OTHER.search(phrase)
-    if other and other.group(1) != f.get("account"):
-        f["other"] = other.group(1)
-
-    item = ""
+    item, qty = "", ""
     q = RE_ECON_QUOTED.search(phrase)
     if q:
         item = (q.group(1) or q.group(2) or "").strip()
@@ -559,7 +600,6 @@ def _f_econ(txt, steam, name):
         if it:
             item = it.group(1).strip(" ,.")
     item = re.sub(r"^(a|an|the|new)\s+", "", item, flags=re.I)
-    qty = ""
     qm = re.match(r"^(\d+)\s*x\s+(.+)$", item, re.I)
     if qm:
         qty, item = qm.group(1), qm.group(2).strip()
@@ -574,32 +614,63 @@ def _f_econ(txt, steam, name):
             item = re.sub(r"\d{6,}", "", item).strip()
     if item:
         f["item"] = item
+        if qty:
+            f["qty"] = qty
 
-    # 交易商（at Trader Bob）与交易对手（to Name(ID:...)）
+    # 交易商（at Trader Bob）
     mc = RE_ECON_MERCHANT.search(phrase)
     if mc and not re.match(r"^\d", mc.group(1)):
         f["merchant"] = mc.group(1).strip()
-    pr = RE_ECON_PEER.search(phrase)
-    if pr and pr.group(1).strip() != f.get("name"):
-        f["peer"] = pr.group(1).strip()
 
-    # 明细列给中文说明：物品 + 银行账号 + 交易商，逐项拼起来
-    parts = []
+    # 交易给谁：先看 "to 玩家(ID:…)" / "to Account Number:…"
+    # “belonging to” 是“属于”，不是转给对方，先屏蔽掉免得误判
+    target = ""
+    scan = re.sub(r"\bbelonging\s+to\b", "belonging", phrase, flags=re.I)
+    tg = RE_ECON_TARGET.search(scan)
+    if tg:
+        acc = tg.group("acc")
+        who = (tg.group("who") or "").strip()
+        if acc:
+            if acc == f.get("account"):
+                target = "本人账户"
+            else:
+                f["other"] = acc
+                target = "账号 " + acc
+        elif who and who != f.get("name"):
+            f["peer"] = who
+            if tg.group("steam"):
+                f["peer_steam"] = tg.group("steam")
+            target = "玩家 " + who
+
+    # 兜底："belonging to Account Number:…" 这类没有 to 的写法
+    if not target:
+        other = RE_ECON_OTHER.search(phrase)
+        if other and other.group(1) != f.get("account"):
+            f["other"] = other.group(1)
+            target = "账号 " + other.group(1)
+
+    if not target and f.get("merchant"):
+        target = "交易商 " + f["merchant"]
+
+    act = f.get("act") or ""
+    if not target:
+        # 没有明确对手时，只给方向性说明；销毁/作废这类不编造对象
+        target = ECON_TARGET_DESC.get(act, "")
+
+    f["target"] = target
+
+    # 物品列：中文译名 + 数量
     if item:
         zh = _zh_item(item)
-        if zh and zh != "卡":            # 只说了“卡”等于没说，交给行为说明
-            parts.append("「%s」%s" % (zh, "×" + qty if qty else ""))
-    if f.get("other"):
-        parts.append("对方账号 %s" % f["other"])
-    if f.get("peer"):
-        parts.append("对方 %s" % f["peer"])
-    if f.get("merchant"):
-        parts.append("交易商 %s" % f["merchant"])
-    act = f.get("act") or ""
-    if not parts:
-        # 没抓到具体对象就退回到行为的通用说明；认不出的写法保留原文
-        parts.append(ECON_ACT_DESC.get(act) or phrase)
-    f["what"] = " · ".join(p for p in parts if p)
+        if zh == "卡":
+            zh = "银行卡"
+        elif zh == "门禁卡":
+            zh = "门禁卡"
+        f["item_txt"] = zh + ("×" + qty if qty else "")
+
+    # 兼容旧的“说明”字段：物品 · 对象
+    parts = [f.get("item_txt") or "", target]
+    f["what"] = " · ".join(p for p in parts if p) or ECON_ACT_DESC.get(act) or phrase
 
     f["pos"] = _pos(txt)
     return f

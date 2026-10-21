@@ -59,13 +59,13 @@ const SCHEMAS = {
   },
   economy: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
-      { k: "act", l: "行为", w: "96px", cls: "econact" },
-      { k: "name", l: "玩家昵称", w: "120px", cls: "strong" },
-      { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
-      { k: "account", l: "银行账号", w: "128px", cls: "mono dim copy" },
-      { k: "amount", l: "金额", w: "88px", cls: "num" },
-      { k: "what", l: "说明", w: "1fr" },
+      { k: "time", l: "时间", w: "112px", cls: "dim" },
+      { k: "act", l: "行为", w: "82px", cls: "econact" },
+      { k: "name", l: "玩家昵称", w: "104px", cls: "strong" },
+      { k: "amount", l: "金额", w: "84px", cls: "num" },
+      { k: "item_txt", l: "交易物品", w: "1fr", ph: "—" },
+      { k: "target", l: "交易对象", w: "1.1fr", ph: "—" },
+      { k: "balance", l: "交易后余额", w: "96px", cls: "num dim", ph: "—" },
     ],
   },
   famepoints: {
@@ -504,14 +504,15 @@ async function query(reset, offset) {
 
 /* ---------------- 虚拟滚动 ---------------- */
 function cellHtml(c, r, kw) {
-  const v = cellVal(r, c.k);
+  const raw = cellVal(r, c.k);
+  const v = raw || c.ph || "";
   let style = "";
   if (c.cls === "act") {
     style = ` style="color:${v === "登出" ? "var(--c-logout)" : "var(--c-login)"}"`;
   } else if (c.k === "tag") {
     style = ` style="color:${tagColor(r[1])}"`;
   }
-  const tip = v && v.length > 8 ? ` title="${esc(v)}"` : "";
+  const tip = raw && raw.length > 8 ? ` title="${esc(raw)}"` : "";
   let cls = c.cls || "";
   if (cls === "econact") cls = ECON_OUT.has(v) ? "econout" : ECON_IN.has(v) ? "econin" : "";
   return `<span class="tc ${cls}"${style}${tip}>${hl(v, kw)}</span>`;
@@ -681,6 +682,22 @@ function showDetail(i) {
   if (f.pos && !sc.cols.some((c) => c.k === "pos")) {
     // 体积大的坐标不占表格宽度，放详情里看
     lines.push(`<div class="dr"><span class="dk">位置</span><span class="dv" style="font-family:ui-monospace,Consolas,monospace">${esc(f.pos)}</span></div>`);
+  }
+  if (S.cur && S.cur.type === "economy") {
+    // 表格里省掉的账号、物品原名放到这里，既不挤列宽也不丢信息
+    if (f.account) {
+      lines.push(`<div class="dr"><span class="dk">银行账号</span><span class="dv cp" data-copy="${esc(f.account)}">${esc(f.account)}</span></div>`);
+    }
+    if (f.item && f.item !== f.item_txt) {
+      const q = f.qty ? ` ×${esc(f.qty)}` : "";
+      lines.push(`<div class="dr"><span class="dk">物品原名</span><span class="dv" style="font-family:ui-monospace,Consolas,monospace">${esc(f.item)}${q}</span></div>`);
+    }
+    if (f.peer_steam) {
+      lines.push(`<div class="dr"><span class="dk">对方 SteamID</span><span class="dv cp" data-copy="${esc(f.peer_steam)}">${esc(f.peer_steam)}</span></div>`);
+    }
+    if (!f.balance) {
+      lines.push(`<div class="dr"><span class="dk">余额</span><span class="dv" style="color:var(--muted)">这条日志里没有余额记录</span></div>`);
+    }
   }
   if (steam && !lines.some((x) => x.includes(steam))) {
     lines.push(`<div class="dr"><span class="dk">SteamID</span><span class="dv cp" data-copy="${steam}">${steam}</span></div>`);
