@@ -65,7 +65,7 @@ const SCHEMAS = {
       { k: "amount", l: "金额", w: "84px", cls: "num" },
       { k: "item_txt", l: "交易物品", w: "1fr", ph: "—" },
       { k: "target", l: "交易对象", w: "1.1fr", ph: "—" },
-      { k: "balance", l: "交易后余额", w: "96px", cls: "num dim", ph: "—" },
+      { k: "balance", l: "交易后余额", w: "96px", cls: "num dim", ph: "—", tip: "SCUM 日志里带 balance 字段时才显示；服务端默认不打印余额" },
     ],
   },
   famepoints: {
@@ -431,7 +431,7 @@ function setLogHead() {
   const css = colsCss(sc);
   const head = $("logHead");
   head.style.gridTemplateColumns = css;
-  head.innerHTML = sc.cols.map((c) => `<span class="tc">${c.l}</span>`).join("");
+  head.innerHTML = sc.cols.map((c) => `<span class="tc"${c.tip ? ` title="${esc(c.tip)}"` : ""}>${c.l}</span>`).join("");
   $("logView").style.setProperty("--cols", css);
 }
 
