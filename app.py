@@ -510,7 +510,7 @@ def _f_econ(txt, steam, name):
             item = it.group(1).strip(" ,.")
     item = re.sub(r"^(a|an|the|new)\s+", "", item, flags=re.I)
 
-    # “card 718506004110” 这种，数字其实是关联账号而不是物品
+    # “card 718500000001” 这种，数字其实是关联账号而不是物品
     if item:
         dm = re.fullmatch(r"(?:[\w ]{0,12}?card\s+)?(\d{6,})", item, re.I)
         if dm:
