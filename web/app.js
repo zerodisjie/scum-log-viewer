@@ -60,11 +60,13 @@ const SCHEMAS = {
   economy: {
     cols: [
       { k: "time", l: "时间", w: "126px", cls: "dim" },
-      { k: "evt", l: "事件", w: "90px", cls: "tagcell" },
+      { k: "act", l: "行为", w: "96px", cls: "tagcell" },
       { k: "name", l: "玩家昵称", w: "116px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
-      { k: "action", l: "行为", w: "1fr" },
-      { k: "pos", l: "位置", w: "190px", cls: "mono dim" },
+      { k: "account", l: "银行账号", w: "124px", cls: "mono dim copy" },
+      { k: "amount", l: "金额", w: "88px", cls: "num" },
+      { k: "what", l: "物品 / 明细", w: "1fr" },
+      { k: "pos", l: "位置", w: "180px", cls: "mono dim" },
     ],
   },
   famepoints: {
@@ -710,10 +712,12 @@ async function tick() {
     if (meta.count === S.meta.count) return;
 
     const wrap = $("logWrap");
-    const atBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 80;
+    // 最新在最前：停在顶部说明正在看最新，刷新后继续贴顶；否则原地不动别打扰阅读
+    const atTop = wrap.scrollTop <= 80;
+    const keep = wrap.scrollTop;
     applyMeta(meta);
     await query(true);
-    if (atBottom) wrap.scrollTop = wrap.scrollHeight;
+    wrap.scrollTop = atTop ? 0 : keep;
   } catch { /* 文件正被写入时偶发失败，忽略 */ }
 }
 
@@ -761,7 +765,7 @@ function renderQuickRoots(roots) {
 /* ---------------- 导出 ---------------- */
 function exportRows() {
   if (!S.rows.length) return;
-  const head = `# ${S.cur.typeName} · ${S.rows.length} 条（已按时间合并）\r\n`;
+  const head = `# ${S.cur.typeName} · ${S.rows.length} 条（已按时间合并，最新在前）\r\n`;
   const text = head + S.rows.map((r) =>
     `${fmtFull(r[0])} [${TAG_NAME[r[1]] || r[1]}] ${r[4]}`).join("\r\n");
   const blob = new Blob(["\ufeff" + text], { type: "text/plain;charset=utf-8" });

@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/zerodisjie/scum-log-viewer)](https://github.com/zerodisjie/scum-log-viewer/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 
-版本 **v0.1.1**（本地运行，零第三方依赖，Python 3.9+）
+版本 **v0.1.2**（本地运行，零第三方依赖，Python 3.9+）
 
 本地跑的 SCUM 服务器日志阅读工具。双击启动，浏览器里看，不用装任何第三方库。
 
@@ -12,7 +12,7 @@
 双击  start-server.bat         服务器上开给局域网/远程看
 ```
 
-打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) → `SCUMLogViewer-0.1.1.zip`，解压双击 `start.bat` 就能看。
+打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) → `SCUMLogViewer-0.1.2.zip`，解压双击 `start.bat` 就能看。
 
 ---
 
@@ -28,6 +28,7 @@ SCUM 的日志按 6 小时滚动切分，一天 4 个文件，一个月下来一
 
 - **侧栏只有类型按钮**，不再列文件、不显示路径：点哪个类型就看哪一类，条数和日期范围直接标在按钮上
 - **「全部日志」置顶**：所有类型按时间混排成一条总时间线，还原服务器这段时间到底发生了什么
+- **最新在最前**：打开就是最近发生的事，往下翻才是更早的记录；滚动到底部点「加载更早的记录」继续往前翻
 - 时间列直接带日期（`10-14 12:16:17`），跨天一眼能看出来
 - 只为 `Game version` 占位的空日志组会排到末尾并置灰，标「空」
 
@@ -42,6 +43,7 @@ SCUM 的日志按 6 小时滚动切分，一天 4 个文件，一个月下来一
 | 聊天 | 时间 · 玩家昵称 · 玩家ID · 频道 · 内容 |
 | 管理员指令 | 时间 · 玩家昵称 · 玩家ID · 指令 |
 | 载具销毁 | 时间 · 事件 · 载具 · 载具ID · 车主 · 位置 |
+| 经济交易 | 时间 · 行为 · 玩家昵称 · 玩家ID · 银行账号 · 金额 · 物品/明细 · 位置 |
 | 声望变动 | 时间 · 玩家昵称 · 玩家ID · 声望 · 统计周期 · 累计 · 明细项 |
 | 箱子归属 | 时间 · 箱子ID · 归属玩家 · 玩家ID · 位置 |
 | 违规检测 | 时间 · 事件 · 违规动作 · 描述 · 位置 |
@@ -51,6 +53,15 @@ SCUM 的日志按 6 小时滚动切分，一天 4 个文件，一个月下来一
 - 拆不出字段的行（标题行、异常格式）原文横跨整行显示，不会被吞
 - 点任意一行，右侧把该行所有字段逐条列出来，SteamID / IP 可一键复制
 - 「事件」列来自行首的 `[VehicleInactiveTimerReached]`、`[Disappeared]` 这类标记——同一辆载具的「超时回收」和「已消失」原本长得一模一样，靠这列才分得开
+
+**经济交易**的原始行是一长串英文，直接看很难扫：
+
+```
+Cem(ID:7656119...)(Account Number:718506004110) manually destroyed Starter card
+belonging to Account Number:718506004110, at X=-466451.438 Y=508590.750 Z=85961.828.
+```
+
+拆成表格后，行为归到固定几类（存款 / 取款 / 转账 / 还款 / 贷款 / 购买 / 出售 / 交易 / 销毁卡片 / 开卡 / 锁定卡片 / 退款 / 罚金 / 奖励 / 收入 / 支出 / 其他），金额单独成列并带千分位，物品名和关联账号进「物品 / 明细」，坐标不在表里占地方；完整英文原文保留在详情面板，随时能对照。归到「其他」的是没见过的新写法，不会丢。
 
 ## 隐藏噪声
 
@@ -137,7 +148,7 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `app.py` | 后端：本地 HTTP 服务 + 日志解析引擎 |
 | `web/` | 前端界面（原生 HTML/CSS/JS，无构建） |
 | `启动日志查看器.bat` | 一键启动 |
-| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.1.zip`） |
+| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.2.zip`） |
 | `Logs/` | 你自己的日志目录（不在仓库里，也不会上传） |
 
 `config.json` 只是记住上次打开的目录，可以随时删。
@@ -158,9 +169,9 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 
 ---
 
-## 部署到服务器（v0.1.1）
+## 部署到服务器（v0.1.2）
 
-发行包 `SCUMLogViewer-0.1.1.zip` 解压即用，不需要 pip install：
+发行包 `SCUMLogViewer-0.1.2.zip` 解压即用，不需要 pip install：
 
 | 文件 | 用途 |
 |---|---|

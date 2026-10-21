@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -418,7 +418,120 @@ RE_FAME_LINE = re.compile(
 RE_FAME_DETAIL = re.compile(r"^([A-Za-z][A-Za-z0-9_ ]+):\s*(-?[\d.]+)$")
 RE_CHEST_LINE = re.compile(
     r"entity id:\s*(\d+).*?Owner:\s*(7656\d{13})\s*\(\s*\d*\s*,?\s*([^)]*)\)")
-RE_ECON_LINE = re.compile(r"^(.+?)\(ID:(\d{17})\)\(Account Number:\s*(\d+)\)\s*")
+RE_ECON_ACTOR = re.compile(
+    r"^(?P<name>.+?)\(ID:(?P<steam>\d{17})\)"
+    r"(?:\(Account\s*Number:\s*(?P<acc>\d+)\))?\s*")
+RE_ECON_ACC_ONLY = re.compile(
+    r"^(?P<name>[^(]{1,40}?)\(Account\s*Number:\s*(?P<acc>\d+)\)\s*")
+RE_ECON_OTHER = re.compile(
+    r"(?:belonging\s+to|to|from|into|owner\s+of|towards?)\s*"
+    r"(?:Account\s*Number|account)\s*:?\s*(\d{6,})", re.I)
+RE_ECON_AMT = re.compile(
+    r"(?:amount|value|price|sum|cost|fee|total)\s*[:=]?\s*(-?\d[\d,]*(?:\.\d+)?)"
+    r"|(-?\d[\d,]*(?:\.\d+)?)\s*(?:\$|usd|bucks|cash|scum\s*cash)"
+    r"|\b(?:for|of|deposited|withdrew|transferred|paid|received|spent|worth|"
+    r"reward|bonus|refund|fine|penalt\w*|earned|gained)\s+(-?\d[\d,]*(?:\.\d+)?)",
+    re.I)
+RE_ECON_ITEM = re.compile(
+    r"(?:destroyed|created|issued|unlocked|locked|deleted|added|removed|"
+    r"purchased|bought|sold|received|took|used)\s+(?:a|an|the)?\s*"
+    r"([A-Z0-9][^,]{1,60}?)\s*(?:belonging|from|to|for|at|,|$)", re.I)
+RE_ECON_QUOTED = re.compile(r"'([^']{2,60})'|\"([^\"]{2,60})\"")
+
+# 经济日志的行为分类：从上到下第一条命中即用
+ECON_RULES = (
+    (re.compile(r"\b(manually\s+)?destroy(ed|s|ing)?\b.*\bcard\b", re.I), "销毁卡片"),
+    (re.compile(r"\b(created|issu(e|ed)|new)\b.*\bcard\b", re.I), "开卡"),
+    (re.compile(r"\b(delet|destroy|remov)\w*\b.*\bcard\b", re.I), "删除卡片"),
+    (re.compile(r"\b(lock|block)\w*\b.*\bcard\b", re.I), "锁定卡片"),
+    (re.compile(r"\b(unlock|unblock)\w*\b.*\bcard\b", re.I), "解锁卡片"),
+    (re.compile(r"\bwithdr(aw|ew|awn)\w*\b", re.I), "取款"),
+    (re.compile(r"\bdeposit\w*\b", re.I), "存款"),
+    (re.compile(r"\btransferr?\w*\b", re.I), "转账"),
+    (re.compile(r"\b(paid\s+off|repay\w*|loan\s+repayment)\b", re.I), "还款"),
+    (re.compile(r"\b(loan|borrow)\w*\b", re.I), "贷款"),
+    (re.compile(r"\bpurchas\w*\b|\bbought\b|\bbuy\b", re.I), "购买"),
+    (re.compile(r"\bsold\b|\bsell\w*\b", re.I), "出售"),
+    (re.compile(r"\btrad(e|ed|ing)\b", re.I), "交易"),
+    (re.compile(r"\brefund\w*\b", re.I), "退款"),
+    (re.compile(r"\b(fine|penalt)\w*\b", re.I), "罚金"),
+    (re.compile(r"\breward\w*\b", re.I), "奖励"),
+    (re.compile(r"\b(receiv|credit)\w*\b", re.I), "收入"),
+    (re.compile(r"\b(spent|spend|debit|paid)\w*\b", re.I), "支出"),
+    (re.compile(r"\b(destroy|remov)\w*\b", re.I), "销毁物品"),
+)
+
+
+def _f_econ(txt, steam, name):
+    """经济交易：拆出玩家、账号、行为、金额、物品、关联账号"""
+    txt = re.sub(r"^\[[^\]]{1,24}\]\s*", "", txt)   # 有些行把 [Bank] 留在正文里
+    f = {"name": name or "", "steam": steam or "", "detail": txt}
+    m = RE_ECON_ACTOR.match(txt) or RE_ECON_ACC_ONLY.match(txt)
+    if m:
+        f["name"] = (m.group("name") or "").strip() or f["name"]
+        if "steam" in m.groupdict() and m.group("steam"):
+            f["steam"] = m.group("steam")
+        f["account"] = m.group("acc") or ""
+        rest = txt[m.end():]
+    else:
+        rest = txt
+
+    # 去掉坐标尾巴，剩下的才是行为描述
+    phrase = re.split(r",?\s*at\s+X=", rest)[0].strip().strip(",")
+    f["detail"] = phrase or rest
+
+    for rx, label in ECON_RULES:
+        if rx.search(phrase):
+            f["act"] = label
+            break
+    else:
+        f["act"] = "其他"
+
+    am = RE_ECON_AMT.search(phrase)
+    if am:
+        try:
+            raw = next(g for g in am.groups() if g)
+            f["amount"] = "{:,}".format(int(float(raw.replace(",", "")))) \
+                if "." not in raw else raw
+        except (StopIteration, ValueError):
+            pass
+
+    other = RE_ECON_OTHER.search(phrase)
+    if other and other.group(1) != f.get("account"):
+        f["other"] = other.group(1)
+
+    item = ""
+    q = RE_ECON_QUOTED.search(phrase)
+    if q:
+        item = (q.group(1) or q.group(2) or "").strip()
+    else:
+        it = RE_ECON_ITEM.search(phrase)
+        if it:
+            item = it.group(1).strip(" ,.")
+    item = re.sub(r"^(a|an|the|new)\s+", "", item, flags=re.I)
+
+    # “card 718506004110” 这种，数字其实是关联账号而不是物品
+    if item:
+        dm = re.fullmatch(r"(?:[\w ]{0,12}?card\s+)?(\d{6,})", item, re.I)
+        if dm:
+            f.setdefault("other", dm.group(1))
+            item = re.sub(r"\d{6,}", "", item).strip()
+    if item:
+        f["item"] = item
+
+    what = ""
+    if item and f.get("other"):
+        what = "%s（关联账号 %s）" % (item, f["other"])
+    elif item:
+        what = item
+    elif f.get("other"):
+        what = "账号 %s" % f["other"]
+    else:
+        what = re.sub(r"Account\s*Number\s*:?\s*(\d+)", r"账号 \1", phrase, flags=re.I)
+    f["what"] = what
+
+    f["pos"] = _pos(txt)
+    return f
 RE_VIOL_LINE = re.compile(r"Action:\s*([A-Za-z0-9_]+),?\s*Desc:\s*([^,]+)")
 RE_GAME_LINE = re.compile(
     r"^([A-Za-z]\d+)\s+(Bunker|Cargo Drop|Supply Drop|.*?)\s+(is\s+Active|is\s+Locked|Activated)\b")
@@ -546,11 +659,7 @@ def extract_fields(tag, msg, steam, name, ip, cat=""):
         else:
             f = {"msg": txt}
     elif tag == "economy":
-        m = RE_ECON_LINE.match(txt)
-        f = {"name": m.group(1) if m else name,
-             "steam": m.group(2) if m else steam,
-             "action": txt[m.end():].split(", at ")[0] if m else txt,
-             "pos": _pos(txt)}
+        f = _f_econ(txt, steam, name)
     elif tag == "famepoints":
         m = RE_FAME_LINE.match(txt)
         if m:
@@ -758,11 +867,12 @@ def _build(files, ftype, t0, truncated_flag):
                     if ts > cur[3]:
                         cur[3] = ts
 
-    rows.sort(key=lambda r: r[0])             # 稳定排序，同日按文件/行序
+    # 最新在最前：时间戳相同的保持原始行序（续行仍跟在所属记录后面）
+    rows.sort(key=lambda r: -(r[0] or 0))
 
     total = len(rows)
     if total > MAX_LINES:
-        rows = rows[-MAX_LINES:]
+        rows = rows[:MAX_LINES]               # 截断时丢掉最旧的
         truncated_flag = True
 
     st_types, st_levels, st_groups = {}, {}, {}
