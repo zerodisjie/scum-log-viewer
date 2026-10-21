@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -418,262 +418,410 @@ RE_FAME_LINE = re.compile(
 RE_FAME_DETAIL = re.compile(r"^([A-Za-z][A-Za-z0-9_ ]+):\s*(-?[\d.]+)$")
 RE_CHEST_LINE = re.compile(
     r"entity id:\s*(\d+).*?Owner:\s*(7656\d{13})\s*\(\s*\d*\s*,?\s*([^)]*)\)")
-RE_ECON_ACTOR = re.compile(
-    r"^(?P<name>.+?)\(ID:(?P<steam>\d{17})\)"
-    r"(?:\(Account\s*Number:\s*(?P<acc>\d+)\))?\s*")
-RE_ECON_ACC_ONLY = re.compile(
-    r"^(?P<name>[^(]{1,40}?)\(Account\s*Number:\s*(?P<acc>\d+)\)\s*")
-RE_ECON_OTHER = re.compile(
-    r"(?:belonging\s+to|to|from|into|owner\s+of|towards?)\s*"
-    r"(?:Account\s*Number|account)\s*:?\s*(\d{6,})", re.I)
-RE_ECON_AMT = re.compile(
-    r"(?:amount|value|price|sum|cost|fee|total)\s*[:=]?\s*(-?\d[\d,]*(?:\.\d+)?)"
-    r"|(-?\d[\d,]*(?:\.\d+)?)\s*(?:\$|usd|bucks|cash|scum\s*cash)"
-    r"|\b(?:for|of|deposited|withdrew|transferred|paid|received|spent|worth|"
-    r"reward|bonus|refund|fine|penalt\w*|earned|gained)\w*\s+(-?\d[\d,]*(?:\.\d+)?)",
+# ---------------------------------------------------------------- 经济交易
+# 一次「找交易商卖一背包货」在原始日志里会刷出几十行：每件物品一行，
+# 末尾再补两行 Before / After 给出现金和银行余额：
+#   [Trade] Tradeable (Drill (health: 70.66, uses: 1)) sold by 玩家(7656…) for 383 … to trader Z_3_Trader …
+#   [Trade] Before selling tradeables to trader Z_3_Trader, player 玩家(7656…) had 0 cash, -250 account balance …
+#   [Trade] After tradeable sale to trader Z_3_Trader, player 玩家(7656…) has 383 cash, -250 account balance …
+# 所以这里不按“一行一条”展示，而是把同一笔交易的若干行合成一行。
+
+RE_ECON_TRADE = re.compile(
+    r"Tradeable\s+\((?P<what>.+?)\)\s+(?P<way>sold\s+by|purchased\s+by)\s+"
+    r"(?P<name>.+?)\s*\((?:ID:)?(?P<steam>\d{17})\)\s+for\s+(?P<price>-?\d[\d,]*)", re.I)
+RE_ECON_TRADER = re.compile(r"\b(?:to|from)\s+trader\s+(?P<t>[A-Za-z0-9_]+)", re.I)
+RE_ECON_STATE = re.compile(
+    r"player\s+(?P<name>.+?)\s*\((?:ID:)?(?P<steam>\d{17})\)\s+(?:had|has)\s+"
+    r"(?P<cash>-?\d[\d,]*)\s+cash,\s*(?P<bank>-?\d[\d,]*)\s+(?:(?:bank\s+)?account\s+)?balance\s+and\s+"
+    r"(?P<gold>-?\d[\d,]*)\s+gold\s+and\s+trader\s+(?:had|has)\s+(?P<funds>-?\d[\d,]*)",
     re.I)
-RE_ECON_ITEM = re.compile(
-    r"(?:destroyed|created|issued|unlocked|locked|deleted|added|removed|"
-    r"purchased|bought|sold|received|took|used)\s+(?:a|an|the)?\s*"
-    r"([A-Z0-9][^,]{1,60}?)\s*(?:belonging|from|to|for|at|,|$)", re.I)
-# 交易后余额：SCUM 部分版本/日志级别会打印 "New balance: 12345"
-RE_ECON_BAL = re.compile(
-    r"\b(?:new|current|remaining|updated|old|previous)?\s*balance\b"
-    r"[^0-9\-]{0,12}(-?\d[\d,]*(?:\.\d+)?)", re.I)
-# 交易对象：to Player01(ID:7656...) / to Account Number:718... / received ... from X(ID:...)
-RE_ECON_TARGET = re.compile(
-    r"\b(?:to|towards?|into|from)\s+"
-    r"(?:Account\s*Number\s*:?\s*(?P<acc>\d{6,})"
-    r"|(?P<who>[A-Za-z][\w' \-]{1,28}?)\s*\(ID:(?P<steam>\d{17})\))", re.I)
-RE_ECON_QUOTED = re.compile(r"'([^']{2,60})'|\"([^\"]{2,60})\"")
+RE_ECON_SVC = re.compile(
+    r"Service\s+\((?P<what>.+?)\)\s+purchased\s+by\s+(?P<name>.+?)\s*"
+    r"\((?:ID:)?(?P<steam>\d{17})\)\s+for\s+(?P<price>-?\d[\d,]*)", re.I)
+RE_ECON_DEP = re.compile(
+    r"\bdeposited\s+(?P<amt>-?\d[\d,]*)\s*(?:\(\s*(?P<real>-?\d[\d,]*)\s+was\s+added\s*\))?",
+    re.I)
+RE_ECON_WD = re.compile(r"\bwithdr[ae]w\w*\s+(?P<amt>-?\d[\d,]*)", re.I)
+RE_ECON_NEWBAL = re.compile(r"new\s+account\s+balance\s+is\s+(?P<b>-?\d[\d,]*)", re.I)
+RE_ECON_CARD = re.compile(
+    r"\b(?P<op>purchased|created|issued|destroyed|deleted|locked|unlocked)\s+"
+    r"(?:a|an|the)?\s*(?P<card>[A-Za-z]{2,12}\s+card)\b", re.I)
+RE_ECON_ACCNO = re.compile(r"Account\s*Number\s*:?\s*(?P<acc>\d{6,})", re.I)
+RE_ECON_BAL = re.compile(r"\bbalance\b[^0-9\-]{0,12}(-?\d[\d,]*)", re.I)
+RE_ECON_AMT = re.compile(
+    r"\b(?:for|amount|value|price|sum|cost|fee|total|paid|received|spent|earned|"
+    r"gained|reward|bonus|refund|fine)\b\s*[:=]?\s*(-?\d[\d,]*)", re.I)
 
-# 经济日志的行为分类：从上到下第一条命中即用
+# 认不出的经济行按关键词粗归一类，从上到下第一条命中即用
 ECON_RULES = (
-    (re.compile(r"\b(manually\s+)?destroy(ed|s|ing)?\b.*\bcard\b", re.I), "销毁卡片"),
-    (re.compile(r"\b(created|issu(e|ed)|new)\b.*\bcard\b", re.I), "开卡"),
-    (re.compile(r"\b(delet|destroy|remov)\w*\b.*\bcard\b", re.I), "删除卡片"),
-    (re.compile(r"\b(lock|block)\w*\b.*\bcard\b", re.I), "锁定卡片"),
-    (re.compile(r"\b(unlock|unblock)\w*\b.*\bcard\b", re.I), "解锁卡片"),
-    (re.compile(r"\bwithdr(aw|ew|awn)\w*\b", re.I), "取款"),
-    (re.compile(r"\bdeposit\w*\b", re.I), "存款"),
-    (re.compile(r"\btransferr?\w*\b", re.I), "转账"),
-    (re.compile(r"\b(paid\s+off|repay\w*|loan\s+repayment)\b", re.I), "还款"),
-    (re.compile(r"\b(loan|borrow)\w*\b", re.I), "贷款"),
-    (re.compile(r"\bpurchas\w*\b|\bbought\b|\bbuy\b", re.I), "购买"),
-    (re.compile(r"\bsold\b|\bsell\w*\b", re.I), "出售"),
-    (re.compile(r"\btrad(e|ed|ing)\b", re.I), "交易"),
-    (re.compile(r"\brefund\w*\b", re.I), "退款"),
-    (re.compile(r"\b(fine|penalt)\w*\b", re.I), "罚金"),
-    (re.compile(r"\breward\w*\b", re.I), "奖励"),
-    (re.compile(r"\b(receiv|credit)\w*\b", re.I), "收入"),
-    (re.compile(r"\b(spent|spend|debit|paid)\w*\b", re.I), "支出"),
-    (re.compile(r"\b(destroy|remov)\w*\b", re.I), "销毁物品"),
+    (re.compile(r"\bwithdr[ae]w\w*", re.I), "取款"),
+    (re.compile(r"\btransferr?\w*", re.I), "转账"),
+    (re.compile(r"\b(paid\s+off|repay\w*)", re.I), "还款"),
+    (re.compile(r"\b(loan|borrow)\w*", re.I), "贷款"),
+    (re.compile(r"\bpurchas\w*|\bbought\b", re.I), "购买"),
+    (re.compile(r"\b(fine|penalt)\w*", re.I), "罚金"),
+    (re.compile(r"\b(reward|bonus)\w*", re.I), "奖励"),
+    (re.compile(r"\b(refund|reimburse)\w*", re.I), "退款"),
+    (re.compile(r"\b(destroy|remov|delet)\w*", re.I), "销毁物品"),
 )
 
-
-# 物品名里的固定词翻成中文，认不出的（AKM、M9 Bayonet 这类专有名词）保留原文
-ECON_ITEM_ZH = (
-    (re.compile(r"\bkey\s*card\b", re.I), "门禁卡"),
-    (re.compile(r"\bstarter\b", re.I), "新手"),
-    (re.compile(r"\bgold(?:en)?\b", re.I), "金"),
-    (re.compile(r"\bsilver\b", re.I), "银"),
-    (re.compile(r"\bbronze\b", re.I), "铜"),
-    (re.compile(r"\bplatinum\b", re.I), "铂金"),
-    (re.compile(r"\bcard\b", re.I), "卡"),
-)
-
-# 只说了行为、没提到具体物品时的默认说明
-ECON_ACT_DESC = {
-    "存款": "存入本人账户",
-    "取款": "从本人账户取出",
-    "转账": "本人账户之间转账",
-    "还款": "结清贷款",
-    "贷款": "申请贷款",
-    "购买": "在交易商处购买",
-    "出售": "出售给交易商",
-    "交易": "玩家之间交易",
-    "销毁卡片": "销毁银行卡",
-    "开卡": "新开银行卡",
-    "删除卡片": "删除银行卡",
-    "锁定卡片": "锁定银行卡",
-    "解锁卡片": "解锁银行卡",
-    "退款": "退款到账",
-    "罚金": "扣除罚金",
-    "奖励": "获得奖励",
-    "收入": "账户入账",
-    "支出": "账户出账",
-    "销毁物品": "销毁物品",
+# 交易商编号 -> 中文：A_0_Armory -> A0 军械商
+TRADER_KIND = {
+    "trader": "杂货商", "general": "杂货商", "armory": "军械商", "mechanic": "技工",
+    "saloon": "酒保", "doctor": "医生", "hunter": "猎人", "fisherman": "渔夫",
+    "barber": "理发师", "bank": "银行", "airdrop": "空投商",
 }
 
-# 「对方」列没有明确对手时的方向性说明（不编造具体对象）
-ECON_TARGET_DESC = {
-    "存款": "本人账户",
-    "取款": "本人账户",
-    "开卡": "本人账户",
-    "删除卡片": "本人账户",
-    "锁定卡片": "本人账户",
-    "解锁卡片": "本人账户",
-    "还款": "银行",
-    "贷款": "银行",
-    "退款": "银行",
-    "罚金": "系统",
-    "奖励": "系统",
-    "收入": "系统",
-    "支出": "系统",
+# 物品内部名 -> 中文。表里没有的把下划线换成空格原样显示，不硬翻
+ITEM_ZH = {
+    # 工具 / 杂物
+    "Drill": "电钻",
+    "Rebar_Cutter": "钢筋剪",
+    "Bolt_Cutter": "断线钳",
+    "Screwdriver": "螺丝刀",
+    "Wrench": "扳手",
+    "Hammer": "锤子",
+    "Sledgehammer": "大锤",
+    "Shovel": "铲子",
+    "Pickaxe": "镐",
+    "Axe": "斧头",
+    "1H_Cleaver": "剁骨刀",
+    "1H_Scalpel": "解剖刀",
+    "1H_Kitchen_Knife": "菜刀",
+    "1H_Military_Survival_Knife": "军用求生刀",
+    "2H_Machete": "开山刀",
+    "GasLantern": "煤油灯",
+    "GasMask": "防毒面具",
+    "Radio": "收音机",
+    "Smartphone": "手机",
+    "Smartphone_Battery": "手机电池",
+    "Geiger_Counter_Analogue": "指针盖革计数器",
+    "Geiger_Counter_Digital": "数字盖革计数器",
+    "Thread": "线",
+    "Wire": "铁丝",
+    "Rope": "绳子",
+    "Duct_Tape": "胶带",
+    "Mine_01": "地雷",
+    "CD_Player": "音乐 CD",
+    # 弹药
+    "Cal_9mm": "9mm 子弹",
+    "Cal_9mm_TR": "9mm 训练弹",
+    "Cal_22": ".22 子弹",
+    "Cal_38": ".38 子弹",
+    "Cal_38_TR": ".38 训练弹",
+    "Cal_357_Viper": ".357 Viper 子弹",
+    "Cal_44_Viper": ".44 Viper 子弹",
+    "Cal_338": ".338 子弹",
+    "Cal_338_TR": ".338 训练弹",
+    "Cal_5_45x39mm": "5.45×39mm 子弹",
+    "Cal_7_62x39mm": "7.62×39mm 子弹",
+    "Cal_7_62x39mm_Ammobox": "7.62×39mm 弹药盒",
+    "12_Gauge_Buckshot": "12 号霰弹",
+    "12_Gauge_Slug": "12 号独头弹",
+    "12_Gauge_Slug_Ammobox": "12 号独头弹盒",
+    # 弹匣 / 枪械配件
+    "Magazine_AK47": "AK47 弹匣",
+    "Magazine_M16": "M16 弹匣",
+    "Magazine_M1911": "M1911 弹匣",
+    "Magazine_Block21": "Block21 弹匣",
+    "WeaponSuppressor_AK15": "AK15 消音器",
+    "WeaponScope_ACOG_01": "ACOG 瞄准镜",
+    "WeaponScope_Hunter_35": "猎人 35 瞄准镜",
+    "WeaponFlashlight_DesertEagle": "沙鹰手电",
+    "Police_Handgun_Holster": "警用手枪枪套",
+    # 装备 / 载具件
+    "Armor_Police_Vest_01": "警用防弹衣",
+    "Military_Helmet_01_02": "军用头盔",
+    "Military_Goggles_01": "军用护目镜",
+    "Military_Boots_01": "军靴",
+    "Dirtbike_Body_Item": "越野摩托 车架",
+    "Cruiser_Seat_Rear_Item": "巡航摩托 后座",
+    "Rager_Lights_RearRight": "Rager 后右车灯",
+    "Rager_Lights_RearLeft": "Rager 后左车灯",
+    "Rager_Bumper_Front_C": "Rager 前保险杠",
+    "BPC_Rager_Bumper_Front_C": "Rager 前保险杠 C",
+    "BPC_Rager_Body_Front_C": "Rager 前车身 C",
+    # 吃喝
+    "Whiskey": "威士忌",
+    "Can01": "罐头",
+    "Can04": "罐头",
+    "Water": "水",
+    "Apple": "苹果",
+    "Potato": "土豆",
 }
 
-RE_ECON_MERCHANT = re.compile(r"\bat\s+([A-Za-z][\w' .\-]{1,40}?)\s*(?:,|$)", re.I)
-RE_ECON_PEER = re.compile(r"\b(?:to|from|with)\s+([A-Za-z][\w' \-]{1,28}?)\s*\(ID:(\d{17})\)")
+CARD_ZH = {
+    "starter": "新手卡", "classic": "经典卡", "bronze": "铜卡", "silver": "银卡",
+    "gold": "金卡", "platinum": "铂金卡", "banker": "银行家卡", "black": "黑卡",
+}
+
+CARD_ACT = {
+    "purchased": "开卡", "created": "开卡", "issued": "开卡",
+    "destroyed": "销毁卡片", "deleted": "删除卡片",
+    "locked": "锁定卡片", "unlocked": "解锁卡片",
+}
+
+# 动作 -> 交易对象兜底说明（不编造具体对象）
+CARD_OBJ = {
+    "开卡": "本人账户", "销毁卡片": "原账户", "删除卡片": "原账户",
+    "锁定卡片": "本人账户", "解锁卡片": "本人账户",
+}
 
 
-def _fmt_num(raw):
-    """12345 -> 12,345；带小数点就原样"""
-    raw = (raw or "").strip().replace(",", "")
+def _int_of(raw):
+    """'1,234' -> 1234；解析不了返回 None"""
     try:
-        n = float(raw)
-    except ValueError:
+        return int(float((raw or "").replace(",", "")))
+    except (TypeError, ValueError):
+        return None
+
+
+def _money(v):
+    if v is None:
         return ""
-    return "{:,}".format(int(n)) if n == int(n) else "{:,}".format(n)
+    return ("-" if v < 0 else "") + "{:,}".format(abs(int(v)))
 
 
-def _zh_item(item):
-    """Starter card -> 新手卡；AKM 这类专有名保持原样"""
-    out, hit = item, False
-    for rx, zh in ECON_ITEM_ZH:
-        if rx.search(out):
-            out = rx.sub(zh, out)
-            hit = True
-    if hit:
-        out = re.sub(r"\s+", "", out)
-    return out
+def _trader_zh(raw):
+    """A_0_Armory -> A0 军械商"""
+    if not raw:
+        return ""
+    m = re.match(r"^([A-Za-z])_?(\d+)_([A-Za-z]+)$", raw)
+    if m:
+        kind = TRADER_KIND.get(m.group(3).lower(), m.group(3))
+        return "%s%s %s" % (m.group(1).upper(), m.group(2), kind)
+    return TRADER_KIND.get(raw.lower(), raw)
+
+
+def _split_item(what):
+    """'Drill (health: 70.66, uses: 1)' -> ('Drill', 'health: 70.66, uses: 1')"""
+    what = (what or "").strip()
+    k = what.rfind(" (")
+    if k > 0 and what.endswith(")"):
+        return what[:k].strip(), what[k + 2:-1]
+    return what, ""
+
+
+def _item_qc(attrs):
+    """属性串里取数量和状态：stack count / xN / health / filled percentage"""
+    qty, cond = 1, ""
+    m = (re.search(r"stack\s*count\s*:\s*(\d+)", attrs, re.I)
+         or re.match(r"\s*x\s*(\d+)\s*$", attrs, re.I))
+    if m:
+        qty = max(1, int(m.group(1)))
+    m = re.search(r"health\s*:\s*([\d.]+)", attrs, re.I)
+    if m:
+        cond = "耐久 %g%%" % float(m.group(1))
+    else:
+        m = re.search(r"filled\s+percentage\s*:\s*([\d.]+)", attrs, re.I)
+        if m:
+            cond = "剩 %g%%" % float(m.group(1))
+    return qty, cond
+
+
+def _item_zh(raw):
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
+    if raw in ITEM_ZH:
+        return ITEM_ZH[raw]
+    low = raw.lower()
+    if low.startswith("repair attachment "):
+        return _item_zh(raw[18:]) + " 维修件"
+    if low.endswith(" card"):
+        head = low[:-5].strip()
+        if head in CARD_ZH:
+            return CARD_ZH[head]
+    return re.sub(r"_+", " ", raw).strip()
+
+
+def _econ_trade_new(ev):
+    """一笔交易的第一件物品：建行"""
+    f = {
+        "name": ev["name"], "steam": ev["steam"],
+        "act": "出售" if ev["way"] == "sell" else "购买",
+        "dir": "in" if ev["way"] == "sell" else "out",
+        "target": ev["trader"] or "交易商",
+        "items": [], "lines": [], "pos": ev["pos"],
+    }
+    _econ_trade_add(f, ev)
+    return f
+
+
+def _econ_trade_add(f, ev):
+    """把同一笔交易里的下一件物品累加进来，顺带重算金额和物品文案"""
+    raw, attrs = _split_item(ev["what"])
+    qty, cond = _item_qc(attrs)
+    price = ev["price"] or 0
+    f["lines"].append(ev["txt"])
+    for it in f["items"]:
+        if it["raw"] == raw:
+            it["q"] += qty
+            it["p"] += price
+            break
+    else:
+        f["items"].append({"raw": raw, "n": _item_zh(raw), "q": qty,
+                           "p": price, "c": cond})
+
+    total = sum(it["p"] for it in f["items"])
+    f["amount_n"] = total
+    f["amount"] = ("+" if f["dir"] == "in" else "-") + _money(total)
+
+    labs = [it["n"] + ("×%d" % it["q"] if it["q"] > 1 else "") for it in f["items"]]
+    if len(labs) <= 3:
+        f["item_txt"] = "、".join(labs)
+    else:
+        f["item_txt"] = "、".join(labs[:3]) + " 等 %d 种" % len(labs)
+    f["tip"] = ("共 %d 种物品，合计 %s\n" % (len(labs), _money(total)) +
+                "；".join("%s%s %s" % (it["n"], ("×%d" % it["q"]) if it["q"] > 1 else "",
+                                       _money(it["p"])) for it in f["items"]))[:600]
+
+
+def _econ_trade_state(f, ev):
+    """把 After 里的现金 / 银行余额补到这笔交易上"""
+    f["cash"] = _money(ev["cash"])
+    f["bank"] = _money(ev["bank"])
+    if ev.get("gold"):
+        f["gold"] = _money(ev["gold"])
+    if ev.get("funds") is not None:
+        f["funds"] = _money(ev["funds"])
+
+
+def _econ_guess_after(f, state, cash=0, bank=0):
+    """日志没打印余额时，拿上一次已知余额推算，前面加 ≈ 说明是算出来的"""
+    key = f.get("steam") or ""
+    cur = state.get(key)
+    if not cur:
+        return
+    c, b = cur[0] + cash, cur[1] + bank
+    f["cash"] = "≈" + _money(c)
+    f["bank"] = "≈" + _money(b)
+    state[key] = (c, b)
+
+
+def _econ_parse(txt, steam, name, state=None):
+    """一行经济日志 -> (kind, data)
+
+    item  ：交易商买卖里的一件物品，要合进同一笔交易
+    state ：交易前后的余额快照（Before / After），只补数据不出行
+    row   ：自成一行的事件，data 就是表格字段
+    """
+    state = state if state is not None else {}
+    body = re.sub(r"^\[[^\]]{1,24}\]\s*", "", txt).strip()
+    pos = _pos(txt)
+
+    m = RE_ECON_TRADE.search(body)
+    if m:
+        tr = RE_ECON_TRADER.search(body)
+        return "item", {
+            "name": m.group("name").strip(), "steam": m.group("steam"),
+            "way": "sell" if m.group("way").lower().startswith("sold") else "buy",
+            "what": m.group("what"), "price": _int_of(m.group("price")),
+            "trader": _trader_zh(tr.group("t")) if tr else "",
+            "txt": txt, "pos": pos,
+        }
+
+    m = RE_ECON_STATE.search(body)
+    if m:
+        return "state", {
+            "steam": m.group("steam"), "name": m.group("name").strip(),
+            "after": body[:16].lower().startswith("after"),
+            "cash": _int_of(m.group("cash")), "bank": _int_of(m.group("bank")),
+            "gold": _int_of(m.group("gold")), "funds": _int_of(m.group("funds")),
+        }
+
+    f = {"name": name or "", "steam": steam or "", "pos": pos, "detail": body}
+    acc = RE_ECON_ACCNO.search(body)
+    if acc:
+        f["account"] = acc.group(1)
+
+    # 修车 / 修配件这类服务
+    m = RE_ECON_SVC.search(body)
+    if m:
+        raw, attrs = _split_item(m.group("what"))
+        qty, cond = _item_qc(attrs)
+        fee = _int_of(m.group("price")) or 0
+        tr = RE_ECON_TRADER.search(body)
+        f.update({
+            "act": "维修服务", "dir": "out", "amount": "-" + _money(fee),
+            "amount_n": fee, "name": m.group("name").strip(),
+            "steam": m.group("steam"),
+            "item_txt": _item_zh(raw) + ("×%d" % qty if qty > 1 else ""),
+            "target": _trader_zh(tr.group("t")) if tr else "技工",
+            "note": "服务费从现金或银行扣，日志没打印交易后余额",
+        })
+        return "row", f
+
+    # 存款：deposited 283(277 was added)
+    m = RE_ECON_DEP.search(body)
+    if m:
+        amt = _int_of(m.group("amt")) or 0
+        real = _int_of(m.group("real"))
+        real = amt if real is None else real
+        f.update({"act": "存款", "dir": "move", "amount": _money(amt),
+                  "amount_n": amt, "target": "本人账户"})
+        if real != amt:
+            f["note"] = "实际到账 %s，手续费 %s" % (_money(real), _money(amt - real))
+        _econ_guess_after(f, state, cash=-amt, bank=real)
+        return "row", f
+
+    # 取款
+    m = RE_ECON_WD.search(body)
+    if m:
+        amt = _int_of(m.group("amt")) or 0
+        f.update({"act": "取款", "dir": "move", "amount": _money(amt),
+                  "amount_n": amt, "target": "本人账户"})
+        _econ_guess_after(f, state, cash=amt, bank=-amt)
+        return "row", f
+
+    # 银行卡：开卡 / 销卡 / 锁卡
+    card = RE_ECON_CARD.search(body)
+    if card:
+        act = CARD_ACT.get(card.group("op").lower(), "银行卡")
+        head = card.group("card").rsplit(" ", 1)[0].lower()
+        f["act"] = act
+        f["item_txt"] = CARD_ZH.get(head, card.group("card"))
+        f["target"] = CARD_OBJ.get(act, "本人账户")
+        if act in ("销毁卡片", "删除卡片") and f.get("account"):
+            f["target"] = "账号 " + f["account"]
+        nb = RE_ECON_NEWBAL.search(body)
+        cur = state.get(f.get("steam") or "")
+        if nb:
+            bal = _int_of(nb.group("b"))
+            f["bank"] = _money(bal)
+            if cur:
+                f["cash"] = _money(cur[0])
+                state[f["steam"]] = (cur[0], bal)
+        elif cur:
+            _econ_guess_after(f, state)
+        return "row", f
+
+    # 兜底：新写法只做粗归类，原文留给详情面板
+    act = "其他"
+    for rx, label in ECON_RULES:
+        if rx.search(body):
+            act = label
+            break
+    f["act"] = act
+    am = RE_ECON_AMT.search(body)
+    if am:
+        v = _int_of(am.group(1))
+        if v is not None:
+            f["amount"] = _money(v)
+            f["amount_n"] = v
+    bal = RE_ECON_BAL.search(body)
+    if bal:
+        v = _int_of(bal.group(1))
+        if v is not None:
+            f["bank"] = _money(v)
+    if not f.get("amount") and not f.get("item_txt"):
+        f["msg"] = body
+    return "row", f
 
 
 def _f_econ(txt, steam, name):
-    """经济交易：拆出玩家、行为、物品、交易对象、金额、交易后余额"""
-    txt = re.sub(r"^\[[^\]]{1,24}\]\s*", "", txt)   # 有些行把 [Bank] 留在正文里
-    f = {"name": name or "", "steam": steam or "", "detail": txt}
-    m = RE_ECON_ACTOR.match(txt) or RE_ECON_ACC_ONLY.match(txt)
-    if m:
-        f["name"] = (m.group("name") or "").strip() or f["name"]
-        if "steam" in m.groupdict() and m.group("steam"):
-            f["steam"] = m.group("steam")
-        f["account"] = m.group("acc") or ""
-        rest = txt[m.end():]
-    else:
-        rest = txt
-
-    # 去掉坐标尾巴，剩下的才是行为描述
-    phrase = re.split(r",?\s*at\s+X=", rest)[0].strip().strip(",")
-    f["detail"] = phrase or rest
-
-    # 余额先从句子里摘出去：不然 "new balance 5000" 会被金额规则当成交易额
-    amt_text = phrase
-    bal = RE_ECON_BAL.search(phrase)
-    if bal:
-        v = _fmt_num(bal.group(1))
-        if v:
-            f["balance"] = v
-        amt_text = phrase[:bal.start()] + " " + phrase[bal.end():]
-
-    for rx, label in ECON_RULES:
-        if rx.search(phrase):
-            f["act"] = label
-            break
-    else:
-        f["act"] = "其他"
-
-    am = RE_ECON_AMT.search(amt_text)
-    if am:
-        try:
-            v = _fmt_num(next(g for g in am.groups() if g))
-            if v:
-                f["amount"] = v
-        except StopIteration:
-            pass
-
-    item, qty = "", ""
-    q = RE_ECON_QUOTED.search(phrase)
-    if q:
-        item = (q.group(1) or q.group(2) or "").strip()
-    else:
-        it = RE_ECON_ITEM.search(phrase)
-        if it:
-            item = it.group(1).strip(" ,.")
-    item = re.sub(r"^(a|an|the|new)\s+", "", item, flags=re.I)
-    qm = re.match(r"^(\d+)\s*x\s+(.+)$", item, re.I)
-    if qm:
-        qty, item = qm.group(1), qm.group(2).strip()
-    if item and re.search(r"\d{3,}", item):
-        item = ""        # 一长串数字更可能是金额或编号，不当作物品名
-
-    # “card 718500000001” 这种，数字其实是关联账号而不是物品
-    if item:
-        dm = re.fullmatch(r"(?:[\w ]{0,12}?card\s+)?(\d{6,})", item, re.I)
-        if dm:
-            f.setdefault("other", dm.group(1))
-            item = re.sub(r"\d{6,}", "", item).strip()
-    if item:
-        f["item"] = item
-        if qty:
-            f["qty"] = qty
-
-    # 交易商（at Trader Bob）
-    mc = RE_ECON_MERCHANT.search(phrase)
-    if mc and not re.match(r"^\d", mc.group(1)):
-        f["merchant"] = mc.group(1).strip()
-
-    # 交易给谁：先看 "to 玩家(ID:…)" / "to Account Number:…"
-    # “belonging to” 是“属于”，不是转给对方，先屏蔽掉免得误判
-    target = ""
-    scan = re.sub(r"\bbelonging\s+to\b", "belonging", phrase, flags=re.I)
-    tg = RE_ECON_TARGET.search(scan)
-    if tg:
-        acc = tg.group("acc")
-        who = (tg.group("who") or "").strip()
-        if acc:
-            if acc == f.get("account"):
-                target = "本人账户"
-            else:
-                f["other"] = acc
-                target = "账号 " + acc
-        elif who and who != f.get("name"):
-            f["peer"] = who
-            if tg.group("steam"):
-                f["peer_steam"] = tg.group("steam")
-            target = "玩家 " + who
-
-    # 兜底："belonging to Account Number:…" 这类没有 to 的写法
-    if not target:
-        other = RE_ECON_OTHER.search(phrase)
-        if other and other.group(1) != f.get("account"):
-            f["other"] = other.group(1)
-            target = "账号 " + other.group(1)
-
-    if not target and f.get("merchant"):
-        target = "交易商 " + f["merchant"]
-
-    act = f.get("act") or ""
-    if not target:
-        # 没有明确对手时，只给方向性说明；销毁/作废这类不编造对象
-        target = ECON_TARGET_DESC.get(act, "")
-
-    f["target"] = target
-
-    # 物品列：中文译名 + 数量
-    if item:
-        zh = _zh_item(item)
-        if zh == "卡":
-            zh = "银行卡"
-        elif zh == "门禁卡":
-            zh = "门禁卡"
-        f["item_txt"] = zh + ("×" + qty if qty else "")
-
-    # 兼容旧的“说明”字段：物品 · 对象
-    parts = [f.get("item_txt") or "", target]
-    f["what"] = " · ".join(p for p in parts if p) or ECON_ACT_DESC.get(act) or phrase
-
-    f["pos"] = _pos(txt)
-    return f
+    """兼容旧调用：单行直接出字段"""
+    return _econ_parse(txt, steam, name, {})[1]
 
 
 RE_VIOL_LINE = re.compile(r"Action:\s*([A-Za-z0-9_]+),?\s*Desc:\s*([^,]+)")
@@ -962,6 +1110,8 @@ def _build(files, ftype, t0, truncated_flag):
     flist = []
     skipped = 0
     mixed = ftype == ALL_TYPE
+    econ_open = None          # 还没收尾的那笔交易（一次卖多件物品合成一行）
+    econ_state = {}           # steam -> (现金, 银行余额)，给没打印余额的行做推算
 
     for f in files:
         base_tag = (f.get("type") or guess_type(f["path"])) if mixed else ftype
@@ -973,6 +1123,7 @@ def _build(files, ftype, t0, truncated_flag):
         flist.append({"name": f["name"], "size": f["size"], "type": base_tag})
         prev_ts = None
         after_sep = False
+        econ_open = None
         for ln_no, ln in enumerate(text.splitlines(), 1):
             p = parse_line(ln)
             if p is None:
@@ -998,8 +1149,30 @@ def _build(files, ftype, t0, truncated_flag):
                 # 登录文件里把下线单独标出来，方便区分
                 if base_tag == "login" and "logged out" in msg:
                     tag = "logout"
-            rows.append((ts, _sym(tag), lvl, cat, msg, ln_no, steam, ip, src,
-                         extract_fields(base_tag, msg, steam, name, ip, cat)))
+            f = None
+            if base_tag == "economy":
+                kind, ev = _econ_parse(msg, steam, name, econ_state)
+                if kind == "item":
+                    key = (ev["steam"], ev["way"], ev["trader"])
+                    if econ_open is not None and econ_open[0] == key:
+                        _econ_trade_add(econ_open[1], ev)   # 同一笔交易，接着累加
+                    else:
+                        f = _econ_trade_new(ev)
+                        econ_open = (key, f)
+                elif kind == "state":
+                    econ_state[ev["steam"]] = (ev["cash"], ev["bank"])
+                    if econ_open is not None and econ_open[1].get("steam") == ev["steam"]:
+                        _econ_trade_state(econ_open[1], ev)
+                        if ev["after"]:
+                            econ_open = None        # After 之后这笔交易就结束了
+                    continue
+                else:
+                    econ_open = None
+                    f = ev
+            else:
+                econ_open = None
+                f = extract_fields(base_tag, msg, steam, name, ip, cat)
+
             if steam:
                 cur = players.get(steam)
                 if cur is None:
@@ -1010,6 +1183,9 @@ def _build(files, ftype, t0, truncated_flag):
                         cur[1] = name
                     if ts > cur[3]:
                         cur[3] = ts
+            if f is None:               # 已经合并进上一行
+                continue
+            rows.append((ts, _sym(tag), lvl, cat, msg, ln_no, steam, ip, src, f))
 
     # 最新在最前：时间戳相同的保持原始行序（续行仍跟在所属记录后面）
     rows.sort(key=lambda r: -(r[0] or 0))

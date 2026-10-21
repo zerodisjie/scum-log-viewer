@@ -59,13 +59,14 @@ const SCHEMAS = {
   },
   economy: {
     cols: [
-      { k: "time", l: "时间", w: "112px", cls: "dim" },
-      { k: "act", l: "行为", w: "82px", cls: "econact" },
-      { k: "name", l: "玩家昵称", w: "104px", cls: "strong" },
-      { k: "amount", l: "金额", w: "84px", cls: "num" },
-      { k: "item_txt", l: "交易物品", w: "1fr", ph: "—" },
-      { k: "target", l: "交易对象", w: "1.1fr", ph: "—" },
-      { k: "balance", l: "交易后余额", w: "96px", cls: "num dim", ph: "—", tip: "SCUM 日志里带 balance 字段时才显示；服务端默认不打印余额" },
+      { k: "time", l: "时间", w: "104px", cls: "dim" },
+      { k: "act", l: "行为", w: "80px", cls: "econact" },
+      { k: "name", l: "玩家昵称", w: "96px", cls: "strong" },
+      { k: "item_txt", l: "交易物品", w: "1.3fr", ph: "—", tip: "这一笔交易里所有物品；一次卖很多件时显示前三种，「等 N 种」表示总数，鼠标悬停或点开行看完整清单" },
+      { k: "amount", l: "金额", w: "84px", cls: "econmoney", ph: "—", tip: "这一笔交易的总金额，+ 表示卖出进账、− 表示买入或服务支出" },
+      { k: "target", l: "交易对象", w: "1fr", ph: "—", tip: "交易商 / 银行 / 本人账户" },
+      { k: "cash", l: "交易后现金", w: "88px", cls: "num dim", ph: "—", tip: "交易完成时玩家身上的现金。带 ≈ 的是日志没直接打印、用上一条余额和本次金额算出来的" },
+      { k: "bank", l: "交易后账户余额", w: "100px", cls: "num dim", ph: "—", tip: "交易完成时银行卡里的余额。带 ≈ 的同理，是推算值" },
     ],
   },
   famepoints: {
@@ -124,7 +125,7 @@ const SCHEMAS = {
 };
 
 // 经济交易：行为配色（钱出去偏红、钱进来偏绿，其余保持中性）
-const ECON_OUT = new Set(["购买", "支出", "罚金", "销毁卡片", "销毁物品", "删除卡片"]);
+const ECON_OUT = new Set(["购买", "维修服务", "支出", "罚金", "销毁卡片", "销毁物品", "删除卡片", "锁定卡片"]);
 const ECON_IN = new Set(["收入", "奖励", "退款", "出售", "取款"]);
 
 const EVT_NAME = {
@@ -206,6 +207,13 @@ const pad = (n, w = 2) => String(n).padStart(w, "0");
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// 金额千分位：383 -> 383，4711 -> 4,711
+function num(v) {
+  const n = Number(v);
+  if (!isFinite(n)) return v == null ? "" : String(v);
+  return n.toLocaleString("en-US");
 }
 
 function hl(s, kw) {
@@ -506,15 +514,22 @@ async function query(reset, offset) {
 function cellHtml(c, r, kw) {
   const raw = cellVal(r, c.k);
   const v = raw || c.ph || "";
+  const f = r[9] || {};
   let style = "";
   if (c.cls === "act") {
     style = ` style="color:${v === "登出" ? "var(--c-logout)" : "var(--c-login)"}"`;
   } else if (c.k === "tag") {
     style = ` style="color:${tagColor(r[1])}"`;
   }
-  const tip = raw && raw.length > 8 ? ` title="${esc(raw)}"` : "";
   let cls = c.cls || "";
   if (cls === "econact") cls = ECON_OUT.has(v) ? "econout" : ECON_IN.has(v) ? "econin" : "";
+  if (cls === "econmoney") {
+    const d = f.dir;
+    cls = d === "in" ? "econin" : d === "out" ? "econout" : "num";
+  }
+  // 物品列悬停时给出完整清单，比列宽里那几个字有用
+  const tipTxt = c.k === "item_txt" && f.tip ? f.tip : (raw && raw.length > 8 ? raw : "");
+  const tip = tipTxt ? ` title="${esc(tipTxt)}"` : "";
   return `<span class="tc ${cls}"${style}${tip}>${hl(v, kw)}</span>`;
 }
 
@@ -688,15 +703,30 @@ function showDetail(i) {
     if (f.account) {
       lines.push(`<div class="dr"><span class="dk">银行账号</span><span class="dv cp" data-copy="${esc(f.account)}">${esc(f.account)}</span></div>`);
     }
-    if (f.item && f.item !== f.item_txt) {
+    if (f.items && f.items.length) {
+      const li = f.items.map((it) =>
+        `${esc(it.n)}${it.q > 1 ? ` ×${it.q}` : ""}${it.c ? `<span class="econdim">（${esc(it.c)}）</span>` : ""}` +
+        `<span class="econdim"> — ${esc(num(it.p))}</span>`).join("<br>");
+      lines.push(`<div class="dr"><span class="dk">物品明细</span><span class="dv">${li}</span></div>`);
+      lines.push(`<div class="dr"><span class="dk">合计</span><span class="dv">${f.items.length} 种 · ${esc(f.amount || "")}</span></div>`);
+    } else if (f.item && f.item !== f.item_txt) {
       const q = f.qty ? ` ×${esc(f.qty)}` : "";
       lines.push(`<div class="dr"><span class="dk">物品原名</span><span class="dv" style="font-family:ui-monospace,Consolas,monospace">${esc(f.item)}${q}</span></div>`);
+    }
+    if (f.note) {
+      lines.push(`<div class="dr"><span class="dk">备注</span><span class="dv" style="color:var(--muted)">${esc(f.note)}</span></div>`);
+    }
+    if (f.funds) {
+      lines.push(`<div class="dr"><span class="dk">交易商资金</span><span class="dv">${esc(f.funds)}</span></div>`);
+    }
+    if (f.gold) {
+      lines.push(`<div class="dr"><span class="dk">金币</span><span class="dv">${esc(f.gold)}</span></div>`);
     }
     if (f.peer_steam) {
       lines.push(`<div class="dr"><span class="dk">对方 SteamID</span><span class="dv cp" data-copy="${esc(f.peer_steam)}">${esc(f.peer_steam)}</span></div>`);
     }
-    if (!f.balance) {
-      lines.push(`<div class="dr"><span class="dk">余额</span><span class="dv" style="color:var(--muted)">这条日志里没有余额记录</span></div>`);
+    if (!f.cash && !f.bank) {
+      lines.push(`<div class="dr"><span class="dk">余额</span><span class="dv" style="color:var(--muted)">这条日志没有交易后余额</span></div>`);
     }
   }
   if (steam && !lines.some((x) => x.includes(steam))) {
@@ -708,7 +738,12 @@ function showDetail(i) {
   if (f.noise) {
     lines.push(`<div class="dr"><span class="dk">标记</span><span class="dv" style="color:var(--muted)">引擎启动日志</span></div>`);
   }
-  lines.push(`<div class="dmsg">${esc(msg)}</div>`);
+  if (f.lines && f.lines.length > 1) {
+    lines.push(`<div class="dr"><span class="dk">原始日志</span><span class="dv" style="color:var(--muted)">这一笔交易合并了 ${f.lines.length} 行原始记录</span></div>`);
+    lines.push(`<div class="dmsg">${f.lines.map((x) => esc(x)).join("<br>")}</div>`);
+  } else {
+    lines.push(`<div class="dmsg">${esc(msg)}</div>`);
+  }
   d.innerHTML = lines.join("");
 
   d.querySelectorAll("[data-copy]").forEach((n) => {

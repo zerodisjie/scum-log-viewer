@@ -601,10 +601,11 @@ main {
   word-break: break-all;
 }
 .detail .dr { display: flex; gap: 8px; margin-bottom: 4px; }
-.detail .dk { color: var(--muted); width: 52px; flex: none; }
+.detail .dk { color: var(--muted); width: 66px; flex: none; }
 .detail .dv { color: var(--text-dim); font-family: ui-monospace, Consolas, monospace; }
 .detail .dv.cp { cursor: pointer; }
 .detail .dv.cp:hover { color: var(--accent); }
+.detail .econdim { color: var(--muted); }
 .detail .tznote {
   margin-left: 8px; padding: 0 5px; border-radius: 3px;
   font-size: 11px; color: var(--muted); background: rgba(127, 127, 127, .14);
