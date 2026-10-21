@@ -170,7 +170,7 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.4.zip`） |
 | `Logs/` | 你自己的日志目录（不在仓库里，也不会上传） |
 
-`config.json` 只是记住上次打开的目录，可以随时删。
+上次打开的日志目录存在 `%LOCALAPPDATA%\SCUMLogViewer\config.json`，**不在程序目录里**——所以换一个版本解压到新文件夹，打开后仍然接着上次的目录和标签页，不用重新选。想清空就删这个文件。
 
 ## 常见问题
 
@@ -198,7 +198,7 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `web/` | 前端界面 |
 | `start.bat` | 本机模式，自动开浏览器 |
 | `start-server.bat` | 服务器模式，监听 `0.0.0.0:8787`，不开浏览器 |
-| `config.json` | 记住上次日志目录，可删 |
+| `%LOCALAPPDATA%\SCUMLogViewer\config.json` | 记住上次的日志目录和标签页，不在程序目录，删了也不影响使用 |
 | `VERSION` | 版本号 |
 
 **Windows 服务器**
@@ -211,7 +211,8 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 netsh advfirewall firewall add rule name="SCUM Log Viewer" dir=in action=allow protocol=TCP localport=8787
 ```
 
-4. 目录记不住也没关系：页面右上角「打开目录」指过去，会写进 `config.json`
+4. 换版本只要把新的 zip 解压到**任意位置**再启动就行：目录记在 `%LOCALAPPDATA%\SCUMLogViewer\config.json`，跟程序目录无关，不用重新指定日志目录
+5. 从没指定过的话，页面右上角点「打开目录」指一次，以后都记得
 
 **开机自启 / 后台常驻**
 

@@ -307,8 +307,11 @@ async function boot() {
   const init = await api("/api/init");
   if (init.version) $("appVer").textContent = "v" + init.version;
   const qs = new URLSearchParams(location.search);
-  if (init.root) setRoot(init.root, init.groups, qs.get("type"));
+  if (init.root) setRoot(init.root, init.groups, qs.get("type") || init.lastType);
   else $("emptyText").textContent = "没找到 SCUM 日志目录，点「打开目录」手动指定";
+  if (init.missing) {
+    $("emptyText").textContent = "上次打开的目录不在了：" + init.missing + " —— 点「打开目录」重新指定";
+  }
   if (init.candidates) renderQuickRoots(init.candidates);
 }
 
@@ -398,6 +401,10 @@ function openGroup(g) {
 async function open(target) {
   S.busy = true;
   S.cur = target;
+  // 记住这次看的是哪一类，下次启动（包括换了新版本）直接回到这里
+  if (target.kind === "group") {
+    api("/api/remember?type=" + encodeURIComponent(target.type)).catch(() => {});
+  }
   S.only = "";
   S.cats.clear();
   S.selIdx = -1;

@@ -26,11 +26,27 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
-CFG = os.path.join(BASE, "config.json")
+
+
+def _cfg_dir():
+    """配置放在用户目录，跟着人走、不跟着程序目录走。
+
+    换版本时程序会解压到新的文件夹，如果配置写在程序目录里，
+    上次打开的日志目录就跟着旧目录一起被丢下了，每次都得重新选。
+    """
+    for env in ("LOCALAPPDATA", "APPDATA"):
+        d = os.environ.get(env)
+        if d and os.path.isdir(d):
+            return os.path.join(d, "SCUMLogViewer")
+    return os.path.join(os.path.expanduser("~"), ".scum-log-viewer")
+
+
+CFG = os.path.join(_cfg_dir(), "config.json")
+CFG_OLD = os.path.join(BASE, "config.json")        # 老版本把配置写在程序目录里
 
 MAX_BYTES = 120 * 1024 * 1024      # 单文件最多读取 120MB（超出取尾部）
 MAX_LINES = 400000                 # 合并后最多保留 40 万行（超出取最新的）
@@ -181,19 +197,39 @@ def steam_roots():
 
 
 def load_cfg():
-    try:
-        with open(CFG, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    """先读用户目录的配置；没有就找老版本留在程序目录里的，顺手搬过来"""
+    for path in (CFG, CFG_OLD):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if path == CFG_OLD and not os.path.exists(CFG):
+            save_cfg(data)
+        return data
+    return {}
 
 
 def save_cfg(data):
     try:
-        with open(CFG, "w", encoding="utf-8") as f:
+        d = os.path.dirname(CFG)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        tmp = CFG + ".tmp"          # 先写临时文件再替换，断电不会留下半截配置
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, CFG)
     except OSError:
         pass
+
+
+def remember(**kw):
+    """记住这次的打开位置，下次启动直接用"""
+    cfg = load_cfg()
+    cfg.update({k: v for k, v in kw.items() if v is not None})
+    save_cfg(cfg)
 
 
 def default_candidates():
@@ -1355,6 +1391,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(api_open(q))
             if p == "/api/query":
                 return self._json(api_query(q))
+            if p == "/api/remember":
+                remember(type=_clean_type(q.get("type")))
+                return self._json({"ok": True})
             if p == "/api/ping":
                 return self._json({"ok": True})
             return self._send(404, "not found", "text/plain; charset=utf-8")
@@ -1410,19 +1449,31 @@ def _counts_or_none(root):
         return None
 
 
+def _clean_type(t):
+    """只收已知的日志类型名，别把乱七八糟的字符串写进配置"""
+    return t if t and (t == ALL_TYPE or t in LOG_TYPES) else None
+
+
 def api_init(q):
     cfg = load_cfg()
     cands = default_candidates()
+    last = cfg.get("last_root") or ""
     root = None
-    if cfg.get("last_root"):
-        d = guess_log_dir(cfg["last_root"])
+    missing = None
+    if last:
+        d = guess_log_dir(last)
         if os.path.isdir(d):
             root = d
+        else:
+            missing = last            # 上次的目录没了，告诉前端别默默换一个
     if not root and cands:
         root = guess_log_dir(cands[0])
     return {
         "version": VERSION,
         "root": root,
+        "lastRoot": last,
+        "missing": missing,
+        "lastType": _clean_type(cfg.get("type")),
         "candidates": cands,
         "groups": list_groups(root, _counts_or_none(root)) if root else [],
         "home": os.path.expanduser("~"),
@@ -1562,9 +1613,7 @@ def main():
     if args.path:
         d = guess_log_dir(args.path)
         if os.path.isdir(d):
-            cfg = load_cfg()
-            cfg["last_root"] = d
-            save_cfg(cfg)
+            remember(last_root=d)
 
     port = free_port(args.port, args.host)
     if not port:
@@ -1585,6 +1634,13 @@ def main():
     print("=" * 56)
     print(f"  SCUM 服务器日志查看器  v{VERSION}")
     print(f"  地址：{local_url}")
+    cfg_now = load_cfg()
+    kept = cfg_now.get("last_root") or ""
+    if kept and os.path.isdir(guess_log_dir(kept)):
+        print(f"  日志目录：{guess_log_dir(kept)}")
+    else:
+        print("  日志目录：还没指定，页面里点「打开目录」选一次就行")
+    print(f"  配置：{CFG}")
     if args.host not in ("127.0.0.1", "localhost"):
         for ip in lan_addrs():
             print(f"  远程：http://{ip}:{port}/")

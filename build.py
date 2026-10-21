@@ -121,6 +121,14 @@ def build():
     os.makedirs(stage, exist_ok=True)
     packed = []
 
+    # 旧版本在程序目录留过 config.json，清掉，免得被误当成正式配置
+    stale = os.path.join(stage, "config.json")
+    if os.path.exists(stale):
+        try:
+            os.remove(stale)
+        except OSError:
+            pass
+
     for rel in FILES:
         if rel.startswith("assets/"):
             continue  # 模板单独生成
@@ -143,10 +151,9 @@ def build():
             f.write(text)
         packed.append(fname)
 
-    # 干净的配置 + 版本文件
-    with open(os.path.join(stage, "config.json"), "w", encoding="utf-8") as f:
-        f.write("{}\n")
-    packed.append("config.json")
+    # 版本文件
+    # 配置不再打进包里：上次打开的目录存在 %LOCALAPPDATA%\SCUMLogViewer\config.json，
+    # 换版本解压到新文件夹也能接着用，包里放一个空的反而会让人以为配置在程序目录
     with open(os.path.join(stage, "VERSION"), "w", encoding="utf-8") as f:
         f.write(ver + "\n")
     packed.append("VERSION")
