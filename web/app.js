@@ -60,13 +60,12 @@ const SCHEMAS = {
   economy: {
     cols: [
       { k: "time", l: "时间", w: "126px", cls: "dim" },
-      { k: "act", l: "行为", w: "96px", cls: "tagcell" },
-      { k: "name", l: "玩家昵称", w: "116px", cls: "strong" },
+      { k: "act", l: "行为", w: "96px", cls: "econact" },
+      { k: "name", l: "玩家昵称", w: "120px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
-      { k: "account", l: "银行账号", w: "124px", cls: "mono dim copy" },
+      { k: "account", l: "银行账号", w: "128px", cls: "mono dim copy" },
       { k: "amount", l: "金额", w: "88px", cls: "num" },
-      { k: "what", l: "物品 / 明细", w: "1fr" },
-      { k: "pos", l: "位置", w: "180px", cls: "mono dim" },
+      { k: "what", l: "说明", w: "1fr" },
     ],
   },
   famepoints: {
@@ -123,6 +122,10 @@ const SCHEMAS = {
     ],
   },
 };
+
+// 经济交易：行为配色（钱出去偏红、钱进来偏绿，其余保持中性）
+const ECON_OUT = new Set(["购买", "支出", "罚金", "销毁卡片", "销毁物品", "删除卡片"]);
+const ECON_IN = new Set(["收入", "奖励", "退款", "出售", "取款"]);
 
 const EVT_NAME = {
   VehicleInactiveTimerReached: "超时回收",
@@ -509,7 +512,9 @@ function cellHtml(c, r, kw) {
     style = ` style="color:${tagColor(r[1])}"`;
   }
   const tip = v && v.length > 8 ? ` title="${esc(v)}"` : "";
-  return `<span class="tc ${c.cls || ""}"${style}${tip}>${hl(v, kw)}</span>`;
+  let cls = c.cls || "";
+  if (cls === "econact") cls = ECON_OUT.has(v) ? "econout" : ECON_IN.has(v) ? "econin" : "";
+  return `<span class="tc ${cls}"${style}${tip}>${hl(v, kw)}</span>`;
 }
 
 function rowHtml(r, i, kw, sc) {
@@ -672,6 +677,10 @@ function showDetail(i) {
     if (!v) continue;
     const copy = c.k === "steam" || c.k === "victim_id" || c.k === "killer_id" || c.k === "ip";
     lines.push(`<div class="dr"><span class="dk">${c.l}</span><span class="dv${copy ? " cp" : ""}"${copy ? ` data-copy="${esc(v)}"` : ""}>${esc(v)}</span></div>`);
+  }
+  if (f.pos && !sc.cols.some((c) => c.k === "pos")) {
+    // 体积大的坐标不占表格宽度，放详情里看
+    lines.push(`<div class="dr"><span class="dk">位置</span><span class="dv" style="font-family:ui-monospace,Consolas,monospace">${esc(f.pos)}</span></div>`);
   }
   if (steam && !lines.some((x) => x.includes(steam))) {
     lines.push(`<div class="dr"><span class="dk">SteamID</span><span class="dv cp" data-copy="${steam}">${steam}</span></div>`);

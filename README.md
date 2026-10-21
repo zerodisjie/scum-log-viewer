@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/zerodisjie/scum-log-viewer)](https://github.com/zerodisjie/scum-log-viewer/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 
-版本 **v0.1.2**（本地运行，零第三方依赖，Python 3.9+）
+版本 **v0.1.3**（本地运行，零第三方依赖，Python 3.9+）
 
 本地跑的 SCUM 服务器日志阅读工具。双击启动，浏览器里看，不用装任何第三方库。
 
@@ -12,7 +12,7 @@
 双击  start-server.bat         服务器上开给局域网/远程看
 ```
 
-打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) → `SCUMLogViewer-0.1.2.zip`，解压双击 `start.bat` 就能看。
+打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) → `SCUMLogViewer-0.1.3.zip`，解压双击 `start.bat` 就能看。
 
 ---
 
@@ -43,7 +43,7 @@ SCUM 的日志按 6 小时滚动切分，一天 4 个文件，一个月下来一
 | 聊天 | 时间 · 玩家昵称 · 玩家ID · 频道 · 内容 |
 | 管理员指令 | 时间 · 玩家昵称 · 玩家ID · 指令 |
 | 载具销毁 | 时间 · 事件 · 载具 · 载具ID · 车主 · 位置 |
-| 经济交易 | 时间 · 行为 · 玩家昵称 · 玩家ID · 银行账号 · 金额 · 物品/明细 · 位置 |
+| 经济交易 | 时间 · 行为 · 玩家昵称 · 玩家ID · 银行账号 · 金额 · 说明 |
 | 声望变动 | 时间 · 玩家昵称 · 玩家ID · 声望 · 统计周期 · 累计 · 明细项 |
 | 箱子归属 | 时间 · 箱子ID · 归属玩家 · 玩家ID · 位置 |
 | 违规检测 | 时间 · 事件 · 违规动作 · 描述 · 位置 |
@@ -63,7 +63,14 @@ Starter card belonging to Account Number:718500000001, at X=100000.000 Y=20000.0
 
 （示例里的玩家名、SteamID、银行账号和坐标都是虚构的）
 
-拆成表格后，行为归到固定几类（存款 / 取款 / 转账 / 还款 / 贷款 / 购买 / 出售 / 交易 / 销毁卡片 / 开卡 / 锁定卡片 / 退款 / 罚金 / 奖励 / 收入 / 支出 / 其他），金额单独成列并带千分位，物品名和关联账号进「物品 / 明细」，坐标不在表里占地方；完整英文原文保留在详情面板，随时能对照。归到「其他」的是没见过的新写法，不会丢。
+拆成表格后：
+
+- **行为**归到固定几类（存款 / 取款 / 转账 / 还款 / 贷款 / 购买 / 出售 / 交易 / 销毁卡片 / 开卡 / 锁定卡片 / 退款 / 罚金 / 奖励 / 收入 / 支出 / 其他），钱出去的行为标红、钱进来的标绿
+- **金额**单独成列并带千分位（`3,500`），不用在长句子里找数字
+- **说明**是中文短语，只讲「跟什么有关」，不再堆英文原句。例如「新手卡」「金卡」「对方账号 7185…」「交易商 Trader Bob」「结清贷款」
+- 物品名里的固定词会翻译（`Starter card` → 新手卡、`Gold card` → 金卡），AKM 这类专有名词保持原文
+- 坐标不进表格，点开行看详情；完整英文原文也在详情面板里，随时能对照
+- 归到「其他」的是没见过的新写法，说明列保留原句，不会丢行
 
 ## 隐藏噪声
 
@@ -150,7 +157,7 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `app.py` | 后端：本地 HTTP 服务 + 日志解析引擎 |
 | `web/` | 前端界面（原生 HTML/CSS/JS，无构建） |
 | `启动日志查看器.bat` | 一键启动 |
-| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.2.zip`） |
+| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.3.zip`） |
 | `Logs/` | 你自己的日志目录（不在仓库里，也不会上传） |
 
 `config.json` 只是记住上次打开的目录，可以随时删。
@@ -171,9 +178,9 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 
 ---
 
-## 部署到服务器（v0.1.2）
+## 部署到服务器（v0.1.3）
 
-发行包 `SCUMLogViewer-0.1.2.zip` 解压即用，不需要 pip install：
+发行包 `SCUMLogViewer-0.1.3.zip` 解压即用，不需要 pip install：
 
 | 文件 | 用途 |
 |---|---|

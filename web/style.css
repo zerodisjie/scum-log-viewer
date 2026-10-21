@@ -466,6 +466,8 @@ main {
 }
 .tc.dim { color: var(--text-dim); }
 .tc.strong { color: var(--text); font-weight: 500; }
+.tc.econout { color: var(--c-kill); }
+.tc.econin { color: var(--c-economy); }
 .tc.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 11px; }
 .tc.num { font-variant-numeric: tabular-nums; }
 .tc.act { font-weight: 500; }

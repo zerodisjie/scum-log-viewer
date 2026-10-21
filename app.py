@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -462,6 +462,56 @@ ECON_RULES = (
 )
 
 
+# 物品名里的固定词翻成中文，认不出的（AKM、M9 Bayonet 这类专有名词）保留原文
+ECON_ITEM_ZH = (
+    (re.compile(r"\bkey\s*card\b", re.I), "门禁卡"),
+    (re.compile(r"\bstarter\b", re.I), "新手"),
+    (re.compile(r"\bgold(?:en)?\b", re.I), "金"),
+    (re.compile(r"\bsilver\b", re.I), "银"),
+    (re.compile(r"\bbronze\b", re.I), "铜"),
+    (re.compile(r"\bplatinum\b", re.I), "铂金"),
+    (re.compile(r"\bcard\b", re.I), "卡"),
+)
+
+# 只说了行为、没提到具体物品时的默认说明
+ECON_ACT_DESC = {
+    "存款": "存入本人账户",
+    "取款": "从本人账户取出",
+    "转账": "本人账户之间转账",
+    "还款": "结清贷款",
+    "贷款": "申请贷款",
+    "购买": "在交易商处购买",
+    "出售": "出售给交易商",
+    "交易": "玩家之间交易",
+    "销毁卡片": "销毁银行卡",
+    "开卡": "新开银行卡",
+    "删除卡片": "删除银行卡",
+    "锁定卡片": "锁定银行卡",
+    "解锁卡片": "解锁银行卡",
+    "退款": "退款到账",
+    "罚金": "扣除罚金",
+    "奖励": "获得奖励",
+    "收入": "账户入账",
+    "支出": "账户出账",
+    "销毁物品": "销毁物品",
+}
+
+RE_ECON_MERCHANT = re.compile(r"\bat\s+([A-Za-z][\w' .\-]{1,40}?)\s*(?:,|$)", re.I)
+RE_ECON_PEER = re.compile(r"\b(?:to|from|with)\s+([A-Za-z][\w' \-]{1,28}?)\s*\(ID:(\d{17})\)")
+
+
+def _zh_item(item):
+    """Starter card -> 新手卡；AKM 这类专有名保持原样"""
+    out, hit = item, False
+    for rx, zh in ECON_ITEM_ZH:
+        if rx.search(out):
+            out = rx.sub(zh, out)
+            hit = True
+    if hit:
+        out = re.sub(r"\s+", "", out)
+    return out
+
+
 def _f_econ(txt, steam, name):
     """经济交易：拆出玩家、账号、行为、金额、物品、关联账号"""
     txt = re.sub(r"^\[[^\]]{1,24}\]\s*", "", txt)   # 有些行把 [Bank] 留在正文里
@@ -509,6 +559,12 @@ def _f_econ(txt, steam, name):
         if it:
             item = it.group(1).strip(" ,.")
     item = re.sub(r"^(a|an|the|new)\s+", "", item, flags=re.I)
+    qty = ""
+    qm = re.match(r"^(\d+)\s*x\s+(.+)$", item, re.I)
+    if qm:
+        qty, item = qm.group(1), qm.group(2).strip()
+    if item and re.search(r"\d{3,}", item):
+        item = ""        # 一长串数字更可能是金额或编号，不当作物品名
 
     # “card 718500000001” 这种，数字其实是关联账号而不是物品
     if item:
@@ -519,19 +575,36 @@ def _f_econ(txt, steam, name):
     if item:
         f["item"] = item
 
-    what = ""
-    if item and f.get("other"):
-        what = "%s（关联账号 %s）" % (item, f["other"])
-    elif item:
-        what = item
-    elif f.get("other"):
-        what = "账号 %s" % f["other"]
-    else:
-        what = re.sub(r"Account\s*Number\s*:?\s*(\d+)", r"账号 \1", phrase, flags=re.I)
-    f["what"] = what
+    # 交易商（at Trader Bob）与交易对手（to Name(ID:...)）
+    mc = RE_ECON_MERCHANT.search(phrase)
+    if mc and not re.match(r"^\d", mc.group(1)):
+        f["merchant"] = mc.group(1).strip()
+    pr = RE_ECON_PEER.search(phrase)
+    if pr and pr.group(1).strip() != f.get("name"):
+        f["peer"] = pr.group(1).strip()
+
+    # 明细列给中文说明：物品 + 银行账号 + 交易商，逐项拼起来
+    parts = []
+    if item:
+        zh = _zh_item(item)
+        if zh and zh != "卡":            # 只说了“卡”等于没说，交给行为说明
+            parts.append("「%s」%s" % (zh, "×" + qty if qty else ""))
+    if f.get("other"):
+        parts.append("对方账号 %s" % f["other"])
+    if f.get("peer"):
+        parts.append("对方 %s" % f["peer"])
+    if f.get("merchant"):
+        parts.append("交易商 %s" % f["merchant"])
+    act = f.get("act") or ""
+    if not parts:
+        # 没抓到具体对象就退回到行为的通用说明；认不出的写法保留原文
+        parts.append(ECON_ACT_DESC.get(act) or phrase)
+    f["what"] = " · ".join(p for p in parts if p)
 
     f["pos"] = _pos(txt)
     return f
+
+
 RE_VIOL_LINE = re.compile(r"Action:\s*([A-Za-z0-9_]+),?\s*Desc:\s*([^,]+)")
 RE_GAME_LINE = re.compile(
     r"^([A-Za-z]\d+)\s+(Bunker|Cargo Drop|Supply Drop|.*?)\s+(is\s+Active|is\s+Locked|Activated)\b")
