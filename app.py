@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.8"
+VERSION = "0.1.9"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -1552,8 +1552,8 @@ def _econ_summary(root):
 
 def api_overview(q):
     """服务器总览看板：一屏看清这台服务器这段时间的状况"""
-    kind, root, _ftype = _target(q)
-    if kind != "group":
+    root = unquote(q.get("root", ""))
+    if not root:
         return {"error": "缺少参数"}
     if not os.path.isdir(root):
         return {"error": "日志目录不存在"}

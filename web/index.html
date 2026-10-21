@@ -12,7 +12,7 @@
   <div class="brand">
     <span class="logo">SCUM</span>
     <span class="brand-text">日志查看器</span>
-    <span class="ver" id="appVer">v0.1.8</span>
+    <span class="ver" id="appVer">v0.1.9</span>
   </div>
 
   <div class="pathbox" id="pathBox" title="当前日志目录（点「打开目录」可切换）">
@@ -90,16 +90,13 @@
     </div>
   </section>
 
-  <!-- 右：统计 -->
+  <!-- 右：筛选 + 详情（概览指标已统一到顶部指标带，这里不再重复） -->
   <aside class="inspector">
-    <div class="ins-head">概览</div>
-    <div class="cards" id="cards"></div>
-
-    <div class="ins-head">类型分布</div>
-    <div class="typebars" id="typeBars"></div>
-
-    <div class="ins-head">活跃玩家 <span class="hint-mini">按出现次数</span></div>
+    <div class="ins-head">活跃玩家 <span class="hint-mini">点一下只看这个人</span></div>
     <div class="players" id="players"></div>
+
+    <div class="ins-head">类型分布 <span class="hint-mini">点一下筛选</span></div>
+    <div class="typebars" id="typeBars"></div>
 
     <div class="ins-head" id="detailHead" hidden>选中事件</div>
     <div class="detail" id="detail" hidden></div>

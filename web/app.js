@@ -1,6 +1,6 @@
 /* ============ SCUM 日志查看器 前端 ============ */
 
-const ROW_H = 28;
+const ROW_H = 34;      // 必须与 style.css 的 --row-h 一致
 const PAGE = 3000;
 
 /* ---------------- 各类型的表格列定义 ----------------
@@ -11,7 +11,7 @@ const PAGE = 3000;
 const SCHEMAS = {
   login: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "act", l: "动作", w: "60px", cls: "act" },
       { k: "name", l: "玩家昵称", w: "120px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
@@ -21,7 +21,7 @@ const SCHEMAS = {
   },
   kill: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "victim", l: "受害者", w: "116px", cls: "strong" },
       { k: "victim_id", l: "受害者 ID", w: "152px", cls: "mono copy" },
       { k: "killer", l: "击杀者", w: "206px" },
@@ -32,7 +32,7 @@ const SCHEMAS = {
   },
   chat: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "name", l: "玩家昵称", w: "130px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
       { k: "channel", l: "频道", w: "66px", cls: "tagcell" },
@@ -41,7 +41,7 @@ const SCHEMAS = {
   },
   admin: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "name", l: "玩家昵称", w: "124px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
       { k: "cmd", l: "指令 / 内容", w: "1fr", cls: "mono" },
@@ -49,7 +49,7 @@ const SCHEMAS = {
   },
   vehicle_destruction: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "evt", l: "事件", w: "110px", cls: "tagcell" },
       { k: "veh", l: "载具", w: "170px", cls: "strong" },
       { k: "veh_id", l: "载具 ID", w: "86px", cls: "mono" },
@@ -59,7 +59,7 @@ const SCHEMAS = {
   },
   economy: {
     cols: [
-      { k: "time", l: "时间", w: "104px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "act", l: "行为", w: "80px", cls: "econact" },
       { k: "name", l: "玩家昵称", w: "96px", cls: "strong" },
       { k: "item_txt", l: "交易物品", w: "1.3fr", ph: "—", tip: "这一笔交易里所有物品；一次卖很多件时显示前三种，「等 N 种」表示总数，鼠标悬停或点开行看完整清单" },
@@ -72,7 +72,7 @@ const SCHEMAS = {
   },
   famepoints: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "name", l: "玩家昵称", w: "116px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
       { k: ["fame", "value"], l: "声望", w: "104px", cls: "num" },
@@ -83,7 +83,7 @@ const SCHEMAS = {
   },
   chest_ownership: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "chest", l: "箱子 ID", w: "86px", cls: "mono" },
       { k: "name", l: "归属玩家", w: "124px", cls: "strong" },
       { k: "steam", l: "玩家ID", w: "152px", cls: "mono copy" },
@@ -92,7 +92,7 @@ const SCHEMAS = {
   },
   violations: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "evt", l: "事件", w: "140px", cls: "tagcell" },
       { k: "action", l: "违规动作", w: "200px", cls: "mono" },
       { k: "desc", l: "描述", w: "1fr" },
@@ -101,7 +101,7 @@ const SCHEMAS = {
   },
   gameplay: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "target", l: "对象", w: "140px", cls: "strong" },
       { k: "state", l: "状态", w: "96px", cls: "tagcell" },
       { k: "ago", l: "发生于", w: "128px", cls: "dim" },
@@ -110,13 +110,13 @@ const SCHEMAS = {
   },
   loot: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "raw", l: "内容", w: "1fr", cls: "mono" },
     ],
   },
   all: {
     cols: [
-      { k: "time", l: "时间", w: "126px", cls: "dim" },
+      { k: "time", l: "时间", w: "142px", cls: "dim" },
       { k: "tag", l: "类型", w: "82px", cls: "tagcell" },
       { k: "evt", l: "事件", w: "110px", cls: "tagcell" },
       { k: "name", l: "玩家", w: "120px", cls: "strong" },
@@ -418,6 +418,7 @@ async function open(target) {
   if (target.kind === "group" && target.type === DASH) return openDash();
   $("dash").hidden = true;
   $("logPane").hidden = false;
+  setView("log");
   S.busy = true;
   S.cur = target;
   // 记住这次看的是哪一类，下次启动（包括换了新版本）直接回到这里
@@ -458,11 +459,12 @@ async function openDash() {
   S.cur = { kind: "group", type: DASH, typeName: "服务器总览" };
   api("/api/remember?type=" + encodeURIComponent(DASH)).catch(() => {});
   renderGroups();
+  setView("dash");
   $("logPane").hidden = true;
   $("dash").hidden = false;
   $("dash").innerHTML = '<div class="dash-note">正在汇总…</div>';
   try {
-    const d = await api("/api/overview?root=" + encodeURIComponent(S.root));
+    const d = await api("/api/overview?root=" + encodeURIComponent(S.root) + "&type=" + encodeURIComponent(ALL));
     if (d.error) throw new Error(d.error);
     S.dash = d;
     renderDash(d);
@@ -473,11 +475,31 @@ async function openDash() {
   }
 }
 
-function kpi(cls, k, v, sub, unit) {
+/* KPI 图标：24x24 线稿，跟随卡片主色 */
+const KPI_ICON = {
+  logs:  '<path d="M4 4h5l1.6 1.8H16v10.4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M7 10h7M7 13h4"/>',
+  users: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5"/><path d="M16.5 6.2a3 3 0 0 1 0 5.6M17.5 14.4c1.5.6 2.5 1.9 2.5 3.6"/>',
+  door:  '<path d="M13 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7"/><path d="M13 12h4.5l-2-2M17.5 12l-2 2"/><circle cx="14.5" cy="12" r="3.6"/>',
+  money: '<path d="M12 3.5c3.6 0 6.5 1.4 6.5 3.2S15.6 10 12 10 5.5 8.5 5.5 6.7 8.4 3.5 12 3.5z"/><path d="M5.5 6.7v10.6c0 1.8 2.9 3.2 6.5 3.2s6.5-1.4 6.5-3.2V6.7"/><path d="M5.5 12c0 1.8 2.9 3.2 6.5 3.2s6.5-1.4 6.5-3.2"/>',
+  kill:  '<circle cx="12" cy="12" r="7.2"/><path d="M12 3.4v3M12 17.6v3M3.4 12h3M17.6 12h3"/><circle cx="12" cy="12" r="2"/>',
+  risk:  '<path d="M12 3.5 4.6 6.2v5.4c0 4.3 3.1 7.6 7.4 8.9 4.3-1.3 7.4-4.6 7.4-8.9V6.2z"/><path d="M12 9v4M12 15.6v.6"/>',
+};
+
+function kpiIcon(name) {
+  const d = KPI_ICON[name];
+  return d
+    ? `<span class="kic"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg></span>`
+    : "";
+}
+
+function kpi(cls, k, v, sub, unit, icon) {
   return `<div class="kpi ${cls || ""}">
-    <div class="kk">${esc(k)}</div>
-    <div class="kv">${v}${unit ? `<small>${esc(unit)}</small>` : ""}</div>
-    <div class="ks">${esc(sub || "")}</div></div>`;
+    ${kpiIcon(icon)}
+    <div class="kb">
+      <div class="kk">${esc(k)}</div>
+      <div class="kv">${v}${unit ? `<small>${esc(unit)}</small>` : ""}</div>
+      <div class="ks">${esc(sub || "")}</div>
+    </div></div>`;
 }
 
 function rankRow(i, name, val, max, color) {
@@ -492,7 +514,7 @@ function rankRow(i, name, val, max, color) {
 function sparkSvg(trend) {
   const bs = (trend && trend.buckets) || [];
   if (!bs.length) return '<div class="dash-note">没有带时间戳的记录</div>';
-  const W = 800, H = 156, PL = 36, PR = 10, PT = 12, PB = 22;
+  const W = 800, H = 208, PL = 42, PR = 12, PT = 14, PB = 26;
   const iw = W - PL - PR, ih = H - PT - PB;
   const max = Math.max(...bs.map((b) => b.n), 1);
   const px = (i) => PL + (bs.length === 1 ? iw / 2 : (iw * i) / (bs.length - 1));
@@ -558,12 +580,12 @@ function renderDash(d) {
   </div>`;
 
   const kpis = `<div class="kpis">
-    ${kpi("cy", "日志总量", d.logs.toLocaleString(), `${d.days || 0} 天 · ${d.fileCount || 0} 个文件`)}
-    ${kpi("vi", "活跃玩家", (d.playerTotal || 0).toLocaleString(), `最近 24 小时 ${d.active24h || 0} 人有动静`, "人")}
-    ${kpi("", "登录 / 登出", `${d.logins || 0}<span style="color:var(--muted);font-size:14px"> / ${d.logouts || 0}</span>`, "进服次数")}
-    ${kpi("up", "玩家收入", "+" + (ec.in || 0).toLocaleString(), `${ec.deals || 0} 笔交易 · 支出 ${(ec.out || 0).toLocaleString()}`)}
-    ${kpi("am", "击杀", (d.kills || 0).toLocaleString(), d.kills ? "有战斗记录" : "这段时间没有击杀记录")}
-    ${kpi("dn", "风险告警", risk.toLocaleString(), `违规 ${d.violations || 0} · 错误 ${err}`)}
+    ${kpi("cy", "日志总量", d.logs.toLocaleString(), `${d.days || 0} 天 · ${d.fileCount || 0} 个文件`, "", "logs")}
+    ${kpi("vi", "活跃玩家", (d.playerTotal || 0).toLocaleString(), `24 小时内 ${d.active24h || 0} 人活跃`, "人", "users")}
+    ${kpi("", "登录 / 登出", `${d.logins || 0}<span class="kv-sep">/</span>${d.logouts || 0}`, "进服次数", "", "door")}
+    ${kpi("up", "玩家收入", "+" + (ec.in || 0).toLocaleString(), `${ec.deals || 0} 笔交易 · 支出 ${(ec.out || 0).toLocaleString()}`, "", "money")}
+    ${kpi("am", "击杀", (d.kills || 0).toLocaleString(), d.kills ? "有战斗记录" : "暂无击杀记录", "", "kill")}
+    ${kpi("dn", "风险告警", risk.toLocaleString(), `违规 ${d.violations || 0} · 错误 ${err}`, "", "risk")}
   </div>`;
 
   // 类型分布
@@ -654,10 +676,15 @@ function setLogHead() {
 function applyMeta(meta) {
   S.meta = meta;
   renderStatBar();
-  renderCards();
   renderTypeBars();
   renderPlayers();
   renderChips();
+}
+
+/* 看板独占整屏（收起右栏），日志页保留右栏做筛选和详情 */
+function setView(v) {
+  const m = document.querySelector("main");
+  if (m) m.dataset.view = v;
 }
 
 /* ---------------- 日志页顶部指标带 ---------------- */
@@ -669,8 +696,8 @@ function renderStatBar() {
   const err = lv.error || 0;
   const warn = lv.warn || 0;
   const range = m.first ? `${fmtShort(m.first)} → ${fmtShort(m.last)}` : "无时间戳";
-  const stat = (k, v, cls) =>
-    `<div class="stat"><div class="sk">${esc(k)}</div><div class="sv ${cls || ""}">${v}</div></div>`;
+  const stat = (k, v, cls, wide) =>
+    `<div class="stat${wide ? " wide" : ""}"><div class="sk">${esc(k)}</div><div class="sv ${cls || ""}">${v}</div></div>`;
 
   box.innerHTML =
     stat("当前视图", esc(m.typeName || "—"), "dim") +
@@ -678,7 +705,7 @@ function renderStatBar() {
     stat("覆盖天数", (m.days || 0) + " 天") +
     stat("涉及玩家", (m.playerTotal || (m.players || []).length || 0).toLocaleString()) +
     stat("错误 / 警告", `${err} / ${warn}`, err ? "err" : "") +
-    stat("时间范围", esc(range), "dim");
+    stat("时间范围", esc(range), "dim", true);
 }
 
 /* ---------------- 查询 ---------------- */
@@ -807,24 +834,6 @@ function paint() {
 }
 
 /* ---------------- 右栏 ---------------- */
-function renderCards() {
-  const m = S.meta;
-  const err = (m.stats.levels && m.stats.levels.error) || 0;
-  const warn = (m.stats.levels && m.stats.levels.warn) || 0;
-  const isAll = m.type === ALL;
-  const kinds = Object.keys(m.stats.types).length;
-  const typeLine = isAll
-    ? `全部日志 · ${kinds} 种类型合并`
-    : `${esc(m.typeName)}`;
-
-  $("cards").innerHTML = `
-    <div class="card"><div class="k">日志条数</div><div class="v">${m.count.toLocaleString()}</div></div>
-    <div class="card"><div class="k">覆盖天数</div><div class="v">${m.days ? m.days + " 天" : "—"}</div></div>
-    <div class="card"><div class="k">错误</div><div class="v" style="color:var(--c-error)">${err.toLocaleString()}</div></div>
-    <div class="card"><div class="k">警告</div><div class="v" style="color:var(--c-warn)">${warn.toLocaleString()}</div></div>
-    <div class="card wide"><div class="k">时间范围</div><div class="v sm">${m.first ? `${fmtShort(m.first)} → ${fmtShort(m.last)}` : "无时间戳"}</div></div>
-    <div class="card wide"><div class="k">范围</div><div class="v sm">${typeLine}</div></div>`;
-}
 
 function renderTypeBars() {
   const box = $("typeBars");
