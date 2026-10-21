@@ -65,8 +65,9 @@ const SCHEMAS = {
       { k: "item_txt", l: "交易物品", w: "1.3fr", ph: "—", tip: "这一笔交易里所有物品；一次卖很多件时显示前三种，「等 N 种」表示总数，鼠标悬停或点开行看完整清单" },
       { k: "amount", l: "金额", w: "84px", cls: "econmoney", ph: "—", tip: "这一笔交易的总金额，+ 表示卖出进账、− 表示买入或服务支出" },
       { k: "target", l: "交易对象", w: "1fr", ph: "—", tip: "交易商 / 银行 / 本人账户" },
-      { k: "cash", l: "交易后现金", w: "88px", cls: "num dim", ph: "—", tip: "交易完成时玩家身上的现金。带 ≈ 的是日志没直接打印、用上一条余额和本次金额算出来的" },
-      { k: "bank", l: "交易后账户余额", w: "100px", cls: "num dim", ph: "—", tip: "交易完成时银行卡里的余额。带 ≈ 的同理，是推算值" },
+      { k: "cash", l: "现金", w: "80px", cls: "num dim", ph: "—", tip: "交易完成后玩家身上的现金（钞票）。带 ≈ 的是日志没直接打印、用上一条余额和本次金额算出来的" },
+      { k: "bank", l: "银行存款", w: "92px", cls: "num dim", ph: "—", tip: "交易完成后 ATM 卡里的存款，单位 credits，就是存在银行的那部分现金。带 ≈ 的是推算值" },
+      { k: "gold", l: "金条", w: "64px", cls: "num dim", ph: "—", tip: "交易完成后身上的金条，日志里写的是 gold。留空的表示这条日志没打印金条" },
     ],
   },
   famepoints: {
@@ -719,14 +720,14 @@ function showDetail(i) {
     if (f.funds) {
       lines.push(`<div class="dr"><span class="dk">交易商资金</span><span class="dv">${esc(f.funds)}</span></div>`);
     }
-    if (f.gold) {
-      lines.push(`<div class="dr"><span class="dk">金币</span><span class="dv">${esc(f.gold)}</span></div>`);
+    if (f.gold !== undefined && f.gold !== null && f.gold !== "") {
+      lines.push(`<div class="dr"><span class="dk">金条</span><span class="dv">${esc(f.gold)}</span></div>`);
     }
     if (f.peer_steam) {
       lines.push(`<div class="dr"><span class="dk">对方 SteamID</span><span class="dv cp" data-copy="${esc(f.peer_steam)}">${esc(f.peer_steam)}</span></div>`);
     }
     if (!f.cash && !f.bank) {
-      lines.push(`<div class="dr"><span class="dk">余额</span><span class="dv" style="color:var(--muted)">这条日志没有交易后余额</span></div>`);
+      lines.push(`<div class="dr"><span class="dk">余额</span><span class="dv" style="color:var(--muted)">这条日志没打印交易后余额</span></div>`);
     }
   }
   if (steam && !lines.some((x) => x.includes(steam))) {

@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(BASE, "web")
@@ -567,6 +567,9 @@ CARD_OBJ = {
     "锁定卡片": "本人账户", "解锁卡片": "本人账户",
 }
 
+# 开卡工本费：日志不打印，靠开卡前后的现金/余额差额反推得出
+CARD_FEE = 100
+
 
 def _int_of(raw):
     """'1,234' -> 1234；解析不了返回 None"""
@@ -678,10 +681,10 @@ def _econ_trade_add(f, ev):
 
 
 def _econ_trade_state(f, ev):
-    """把 After 里的现金 / 银行余额补到这笔交易上"""
+    """把 After 里的现金 / 银行存款 / 金条补到这笔交易上"""
     f["cash"] = _money(ev["cash"])
     f["bank"] = _money(ev["bank"])
-    if ev.get("gold"):
+    if ev.get("gold") is not None:      # 金条为 0 时也要显示，不能用真值判断
         f["gold"] = _money(ev["gold"])
     if ev.get("funds") is not None:
         f["funds"] = _money(ev["funds"])
@@ -693,10 +696,12 @@ def _econ_guess_after(f, state, cash=0, bank=0):
     cur = state.get(key)
     if not cur:
         return
-    c, b = cur[0] + cash, cur[1] + bank
+    c, b, g = cur[0] + cash, cur[1] + bank, cur[2]
     f["cash"] = "≈" + _money(c)
     f["bank"] = "≈" + _money(b)
-    state[key] = (c, b)
+    if g is not None:
+        f["gold"] = _money(g)
+    state[key] = (c, b, g)
 
 
 def _econ_parse(txt, steam, name, state=None):
@@ -790,8 +795,20 @@ def _econ_parse(txt, steam, name, state=None):
             bal = _int_of(nb.group("b"))
             f["bank"] = _money(bal)
             if cur:
-                f["cash"] = _money(cur[0])
-                state[f["steam"]] = (cur[0], bal)
+                cash, gold = cur[0], cur[2]
+                if act == "开卡":
+                    # 开卡工本费 100，日志不打印；现金够就扣现金，不够由卡内余额补。
+                    # 依据 10-20 三次开卡前后对照：383→283、1599-1499=100、5490→5390，全部吻合
+                    pay = min(CARD_FEE, max(cash, 0))
+                    cash -= pay
+                    f["cash"] = "≈" + _money(cash)
+                    f["note"] = ("开卡工本费 %d 从现金扣" % CARD_FEE) if pay == CARD_FEE else \
+                        ("开卡工本费 %d，现金只有 %s，其余从卡内余额扣" % (CARD_FEE, _money(pay)))
+                else:
+                    f["cash"] = _money(cash)
+                if gold is not None:
+                    f["gold"] = _money(gold)
+                state[f["steam"]] = (cash, bal, gold)
         elif cur:
             _econ_guess_after(f, state)
         return "row", f
@@ -1160,7 +1177,7 @@ def _build(files, ftype, t0, truncated_flag):
                         f = _econ_trade_new(ev)
                         econ_open = (key, f)
                 elif kind == "state":
-                    econ_state[ev["steam"]] = (ev["cash"], ev["bank"])
+                    econ_state[ev["steam"]] = (ev["cash"], ev["bank"], ev["gold"])
                     if econ_open is not None and econ_open[1].get("steam") == ev["steam"]:
                         _econ_trade_state(econ_open[1], ev)
                         if ev["after"]:
