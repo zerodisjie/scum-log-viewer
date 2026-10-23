@@ -347,6 +347,7 @@ const DASH = "__dash__";          // 服务器总览大屏（不是一种日志�
 function dashBtn() {
   const on = S.cur && S.cur.type === DASH;
   const b = el("button", "typebtn all" + (on ? " active" : ""));
+  b.style.setProperty("--tc", "var(--cyan)");
   b.innerHTML = `
     <span class="dot" style="background:var(--cyan)"></span>
     <span class="tname">服务器总览</span>
@@ -362,6 +363,7 @@ function typeBtn(g, totalCount) {
   const isAll = g.type === ALL;
   const b = el("button", "typebtn" + (on ? " active" : "") + (isAll ? " all" : "") + (g.hasData ? "" : " dim"));
   const color = isAll ? "var(--c-login)" : tagColor(g.type);
+  b.style.setProperty("--tc", color);   // 侧栏左侧色条 / 选中发光用这个类型色
   const cnt = isAll ? totalCount : g.count;
   const range = g.stampFirst ? `${fmtDay(g.stampFirst)}~${fmtDay(g.stampLast)}` : "";
   const shown = g.hasData ? (cnt != null ? cnt.toLocaleString() : "—") : "空";
@@ -475,6 +477,29 @@ async function openDash() {
   }
 }
 
+/* 数字滚动：KPI / 指标带的数字从 0 跳到目标值（只动纯文本节点） */
+const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+function countUp(root) {
+  if (!root || REDUCED_MOTION) return;
+  for (const n of root.querySelectorAll(".kv, .sv, .mv")) {
+    if (n.children.length) continue;                 // 「12 / 8」这种带分隔符的不动
+    const m = n.textContent.trim().match(/^([+\-−]?)([\d,]+)$/);
+    if (!m) continue;
+    const target = Number(m[2].replace(/,/g, ""));
+    if (!isFinite(target) || target === 0) continue;
+    const sign = m[1] || "";
+    const t0 = performance.now();
+    const fmt = (v) => sign + Math.round(v).toLocaleString();
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / 850);
+      n.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+}
+
 /* KPI 图标：24x24 线稿，跟随卡片主色 */
 const KPI_ICON = {
   logs:  '<path d="M4 4h5l1.6 1.8H16v10.4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M7 10h7M7 13h4"/>',
@@ -552,7 +577,8 @@ function sparkSvg(trend) {
 
   return `<svg class="spark" viewBox="0 0 ${W} ${H}">
     <defs><linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--cyan)" stop-opacity=".30"/>
+      <stop offset="0%" stop-color="var(--cyan)" stop-opacity=".42"/>
+      <stop offset="55%" stop-color="var(--violet)" stop-opacity=".14"/>
       <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
     </linearGradient></defs>
     <g class="grid">${grid}</g>
@@ -646,6 +672,7 @@ function renderDash(d) {
     `<div class="panels-3">${players}${econ}${items}</div>`;
 
   $("dashRefresh").onclick = () => openDash();
+  countUp($("dash"));
   for (const row of $("dash").querySelectorAll("[data-gtype]")) {
     row.onclick = () => {
       const g = S.groups.find((x) => x.type === row.dataset.gtype);
@@ -706,6 +733,8 @@ function renderStatBar() {
     stat("涉及玩家", (m.playerTotal || (m.players || []).length || 0).toLocaleString()) +
     stat("错误 / 警告", `${err} / ${warn}`, err ? "err" : "") +
     stat("时间范围", esc(range), "dim", true);
+
+  countUp(box);
 }
 
 /* ---------------- 查询 ---------------- */
@@ -779,6 +808,7 @@ function cellHtml(c, r, kw) {
     style = ` style="color:${tagColor(r[1])}"`;
   }
   let cls = c.cls || "";
+  if (c.k === "tag") cls = "tagpill";       // 类型列做成 pill，跟着类型色走
   if (cls === "econact") cls = ECON_OUT.has(v) ? "econout" : ECON_IN.has(v) ? "econin" : "";
   if (cls === "econmoney") {
     const d = f.dir;
