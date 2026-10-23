@@ -300,13 +300,14 @@ async function api(path) {
 
 /* ---------------- 初始化 ---------------- */
 async function boot() {
-  const theme = localStorage.getItem("scumlog-theme") || "dark";
+  const qs = new URLSearchParams(location.search);
+  // 主题：URL 上带 ?theme=light / dark 时以它为准，否则用上次记住的
+  const theme = qs.get("theme") || localStorage.getItem("scumlog-theme") || "dark";
   document.documentElement.dataset.theme = theme;
 
   bindUI();
   const init = await api("/api/init");
   if (init.version) $("appVer").textContent = "v" + init.version;
-  const qs = new URLSearchParams(location.search);
   if (init.root) setRoot(init.root, init.groups, qs.get("type") || init.lastType);
   else $("emptyText").textContent = "没找到 SCUM 日志目录，点「打开目录」手动指定";
   if (init.missing) {
@@ -519,6 +520,7 @@ function kpiIcon(name) {
 
 function kpi(cls, k, v, sub, unit, icon) {
   return `<div class="kpi ${cls || ""}">
+    <span class="kglow"></span><span class="kspin"></span>
     ${kpiIcon(icon)}
     <div class="kb">
       <div class="kk">${esc(k)}</div>
@@ -1112,6 +1114,15 @@ function bindUI() {
   const wrap = $("logWrap");
   wrap.addEventListener("scroll", () => requestAnimationFrame(paint), { passive: true });
   window.addEventListener("resize", () => paint());
+
+  /* 鼠标跟随光晕：光标在卡片里移动时，把位置写进 CSS 变量给光晕用 */
+  document.addEventListener("mousemove", (e) => {
+    const card = e.target.closest && e.target.closest(".kpi, .panel, .stat");
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty("--mx", (((e.clientX - r.left) / r.width) * 100).toFixed(1) + "%");
+    card.style.setProperty("--my", (((e.clientY - r.top) / r.height) * 100).toFixed(1) + "%");
+  }, { passive: true });
 
   wrap.addEventListener("click", (e) => {
     const row = e.target.closest(".row");

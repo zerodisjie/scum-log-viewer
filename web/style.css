@@ -49,45 +49,79 @@
   --amber: #fbbf24;
 }
 
+/* ===== 亮色主题：白瓷质感，一律压深、零发光，保证数据可读 ===== */
 html[data-theme="light"] {
-  --bg: #eaf0f7;
-  --panel: rgba(255, 255, 255, .88);
-  --panel-2: rgba(246, 250, 254, .78);
+  --bg: #f2f5f9;
+  --panel: #ffffff;
+  --panel-2: #f7fafd;
   --panel-solid: #ffffff;
-  --border: #d3dde8;
-  --border-soft: #e4ecf4;
-  --text: #131c2a;
-  --text-dim: #3d4c5e;
-  --muted: #6a7a8e;
-  --accent: #0d74ad;
-  --accent-dim: #cfe6f7;
-  --hover: rgba(13, 116, 173, .08);
-  --sel: rgba(13, 116, 173, .15);
-  --shadow: 0 14px 34px rgba(20, 40, 70, .14);
+  --border: #cfdae6;
+  --border-soft: #e2eaf2;
+  --text: #0f1723;
+  --text-dim: #33445a;
+  --muted: #5c6c80;
+  --accent: #0369a1;
+  --accent-dim: #cbe6f8;
+  --hover: rgba(3, 105, 161, .07);
+  --sel: rgba(3, 105, 161, .12);
+  --shadow: 0 12px 28px rgba(20, 40, 70, .13);
 
   --neon-1: #0e7490;
-  --neon-2: #7c3aed;
-  --neon-3: #0f9d63;
-  --glow-strong: rgba(13, 116, 173, .18);
-  --edge: rgba(20, 40, 70, .10);
-  --edge-hi: rgba(20, 40, 70, .22);
+  --neon-2: #6d28d9;
+  --neon-3: #047857;
+  --glow-strong: rgba(3, 105, 161, .14);
+  --edge: rgba(20, 40, 70, .14);
+  --edge-hi: rgba(20, 40, 70, .28);
   --glass-blur: none;
 
-  /* 亮色下看板改成白卡 + 淡阴影，不加发光 */
-  --glass: rgba(255, 255, 255, .94);
+  /* 亮色下看板改成实心白卡 + 淡阴影，不加发光 */
+  --glass: #ffffff;
   --glass-hi: #ffffff;
-  --glass-b: rgba(20, 40, 70, .11);
-  --glass-b-hi: rgba(20, 40, 70, .24);
-  --glow-a: rgba(13, 116, 173, .09);
-  --glow-b: rgba(120, 80, 200, .06);
-  --glow-c: rgba(15, 157, 99, .06);
-  --grid: rgba(20, 40, 70, .09);
-  --kpi-up: #0f9d63;
-  --kpi-dn: #d9484f;
+  --glass-b: rgba(20, 40, 70, .14);
+  --glass-b-hi: rgba(20, 40, 70, .30);
+  --glow-a: rgba(3, 105, 161, .07);
+  --glow-b: rgba(109, 40, 217, .05);
+  --glow-c: rgba(4, 120, 87, .05);
+  --grid: rgba(20, 40, 70, .10);
+  --kpi-up: #047857;
+  --kpi-dn: #b91c1c;
   --kpi-v: #0b1524;
   --cyan: #0e7490;
-  --violet: #7c3aed;
-  --amber: #b45309;
+  --violet: #6d28d9;
+  --amber: #92400e;
+
+  /* 类型色：白底上必须压深一档，否则浅蓝浅紫基本看不见 */
+  --c-admin: #a16207;
+  --c-login: #0369a1;
+  --c-logout: #64748b;
+  --c-chat: #6d28d9;
+  --c-kill: #b91c1c;
+  --c-error: #b91c1c;
+  --c-warn: #92400e;
+  --c-violation: #be185d;
+  --c-violations: #be185d;
+  --c-economy: #047857;
+  --c-building: #8b5e34;
+  --c-base_building_destruction: #8b5e34;
+  --c-vehicle: #0284c7;
+  --c-vehicle_destruction: #0284c7;
+  --c-loot: #4d7c0f;
+  --c-quest: #a21caf;
+  --c-quests: #a21caf;
+  --c-raid: #c2410c;
+  --c-raid_protection: #c2410c;
+  --c-fame: #92400e;
+  --c-famepoints: #92400e;
+  --c-chest: #475569;
+  --c-chest_ownership: #475569;
+  --c-sentry: #be185d;
+  --c-armor_absorption: #0e7490;
+  --c-gameplay: #4338ca;
+  --c-server_notifications: #15803d;
+  --c-network_objects: #475569;
+  --c-event_kill: #b91c1c;
+  --c-cont: #64748b;
+  --c-other: #475569;
 }
 
 /* 类型色 */
@@ -153,7 +187,8 @@ button { font-family: inherit; }
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  background: linear-gradient(180deg, rgba(20, 28, 44, .92), rgba(11, 16, 26, .88));
+  /* 背景走变量：亮色主题下自动变成白底，不会顶着深色底显示深色字 */
+  background: var(--panel);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--border);
@@ -305,7 +340,7 @@ main {
 
 /* 左栏 */
 .sidebar {
-  background: linear-gradient(180deg, rgba(16, 23, 38, .78), rgba(9, 14, 23, .72));
+  background: var(--panel);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-right: 1px solid var(--border);
@@ -717,7 +752,7 @@ main {
 
 /* 右栏 */
 .inspector {
-  background: linear-gradient(180deg, rgba(16, 23, 38, .76), rgba(9, 14, 23, .72));
+  background: var(--panel);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-left: 1px solid var(--border);
@@ -1096,7 +1131,8 @@ html[data-theme="light"] .dash-title {
 .kpi .kk { font-size: 12.5px; color: var(--muted); letter-spacing: .05em; white-space: nowrap; }
 .kpi .kv {
   margin-top: 5px;
-  font-size: 31px; font-weight: 700; line-height: 1.1;
+  font-size: 27px; font-weight: 700; line-height: 1.15;
+  letter-spacing: -.01em;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-variant-numeric: tabular-nums;
   color: var(--kc);
@@ -1385,6 +1421,200 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb {
   overflow: hidden;
 }
 
+/* ============================================================
+   主题补丁 + 视觉增强
+   暗色：漂浮光球 / 旋转渐变边框 / 鼠标跟随光晕 / 色条滑入
+   亮色：上面这些全部关掉，并把深色底改回白底，保证数据可读
+   ============================================================ */
+
+/* ---------- 背景漂浮光球（暗色专属） ---------- */
+.fx-orbs { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.fx-orbs i {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: .45;
+  will-change: transform;
+  animation: orbFloat 20s ease-in-out infinite alternate;
+}
+.fx-orbs i:nth-child(1) { width: 420px; height: 420px; left: -8%;  top: 2%;   background: rgba(34, 211, 238, .34); animation-duration: 24s; }
+.fx-orbs i:nth-child(2) { width: 360px; height: 360px; right: -6%; top: 8%;   background: rgba(167, 139, 250, .30); animation-duration: 19s; animation-delay: -4s; }
+.fx-orbs i:nth-child(3) { width: 320px; height: 320px; left: 38%;  bottom: -12%; background: rgba(52, 211, 153, .22); animation-duration: 27s; animation-delay: -9s; }
+.fx-orbs i:nth-child(4) { width: 260px; height: 260px; left: 12%;  bottom: 6%;  background: rgba(56, 189, 248, .20); animation-duration: 22s; animation-delay: -14s; }
+@keyframes orbFloat {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(5%, 7%, 0) scale(1.14); }
+  100% { transform: translate3d(-6%, -5%, 0) scale(.94); }
+}
+
+/* ---------- KPI 卡：旋转渐变边框 ---------- */
+@property --ang { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.kspin {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: conic-gradient(from var(--ang),
+    transparent 0deg, var(--kc) 38deg, transparent 120deg,
+    transparent 180deg, var(--kc) 218deg, transparent 300deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  opacity: .65;
+  animation: angSpin 7s linear infinite;
+}
+@keyframes angSpin { to { --ang: 360deg; } }
+
+/* ---------- 鼠标跟随光晕 ---------- */
+.kpi > *, .panel > *, .stat > * { position: relative; z-index: 1; }
+.kglow {
+  position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(260px 190px at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--kc, #38bdf8) 26%, transparent), transparent 70%);
+}
+.kpi:hover .kglow { opacity: 1; }
+.panel::after {
+  content: "";
+  position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(340px 240px at var(--mx, 50%) var(--my, 50%),
+    rgba(56, 189, 248, .16), transparent 70%);
+}
+.panel:hover::after { opacity: 1; }
+.stat::before {
+  content: "";
+  position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(200px 140px at var(--mx, 50%) var(--my, 50%),
+    rgba(56, 189, 248, .18), transparent 70%);
+}
+.stat:hover::before { opacity: 1; }
+
+/* ---------- 侧栏：hover/选中时左侧色条滑入 ---------- */
+.typebtn { position: relative; }
+.typebtn::before {
+  content: "";
+  position: absolute; left: 0; top: 16%; bottom: 16%; width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--tc);
+  box-shadow: 0 0 10px var(--tc);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform .22s cubic-bezier(.4, 0, .2, 1);
+}
+.typebtn:hover::before, .typebtn.active::before { transform: scaleY(1); }
+
+/* ---------- 暗色顶栏：把渐变补回来 ---------- */
+html[data-theme="dark"] .topbar {
+  background: linear-gradient(180deg, rgba(19, 27, 44, .94), rgba(11, 16, 26, .9));
+}
+
+/* ---------- 空态图标也发光 ---------- */
+.empty-icon {
+  font-size: 44px;
+  opacity: .35;
+  color: var(--accent);
+  text-shadow: 0 0 24px rgba(56, 189, 248, .5);
+}
+
+/* ============================================================
+   亮色主题：全部收干净，重可读轻特效
+   ============================================================ */
+html[data-theme="light"] .fx-orbs,
+html[data-theme="light"] .fx-scan,
+html[data-theme="light"] .kspin { display: none; }
+
+/* body 的深蓝渐变是暗色的，亮色换浅色 */
+html[data-theme="light"] body {
+  background:
+    radial-gradient(1100px 620px at 50% -18%, #ffffff, transparent 72%),
+    var(--bg);
+}
+
+html[data-theme="light"] body::before { display: none; }   /* 光晕 */
+html[data-theme="light"] body::after  { opacity: .5; }     /* 网格淡化 */
+
+html[data-theme="light"] .kpi,
+html[data-theme="light"] .panel,
+html[data-theme="light"] .stat,
+html[data-theme="light"] .money-cell,
+html[data-theme="light"] .tagx,
+html[data-theme="light"] .detail {
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(20, 40, 70, .10);
+}
+html[data-theme="light"] .kpi:hover,
+html[data-theme="light"] .panel:hover,
+html[data-theme="light"] .stat:hover {
+  box-shadow: 0 14px 30px rgba(20, 40, 70, .16);
+}
+html[data-theme="light"] .kpi::after,
+html[data-theme="light"] .stat::after,
+html[data-theme="light"] .panel-h::before,
+html[data-theme="light"] .typebtn::before,
+html[data-theme="light"] .kpi .kic { box-shadow: none; }
+
+/* 亮色下不要任何发光字，糊 */
+html[data-theme="light"] .kpi .kv,
+html[data-theme="light"] .stat .sv,
+html[data-theme="light"] .money-cell .mv,
+html[data-theme="light"] .rank-i.top,
+html[data-theme="light"] .tc.tagpill,
+html[data-theme="light"] .empty-icon { text-shadow: none; filter: none; }
+html[data-theme="light"] .spark .line { filter: none; }
+html[data-theme="light"] .tb-fill,
+html[data-theme="light"] .rank-fill { box-shadow: none; }
+
+/* 亮色下的 hover / 选中：用实心淡蓝底，别拿青色 rgba 糊 */
+html[data-theme="light"] .trow:hover {
+  background: rgba(3, 105, 161, .08);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+html[data-theme="light"] .trow.sel {
+  background: rgba(3, 105, 161, .13);
+  box-shadow: inset 0 0 0 1px rgba(3, 105, 161, .22);
+}
+html[data-theme="light"] .trow { border-bottom-color: rgba(20, 40, 70, .07); }
+html[data-theme="light"] .trow.lv-error { background: rgba(185, 28, 28, .07); }
+html[data-theme="light"] .trow.lv-warn  { background: rgba(146, 64, 14, .07); }
+html[data-theme="light"] .typebtn:hover { background: rgba(3, 105, 161, .07); }
+html[data-theme="light"] .tc.tagpill {
+  background: color-mix(in srgb, currentColor 13%, #fff);
+  border-color: color-mix(in srgb, currentColor 42%, transparent);
+}
+
+/* 亮色下顶栏/侧栏/弹窗必须是白底（变量已经是白，这里只压掉暗色遗留的半透明叠加） */
+html[data-theme="light"] .topbar,
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .inspector { background: #fff; box-shadow: none; }
+html[data-theme="light"] .topbar::after { opacity: .8; }
+html[data-theme="light"] .sidebar::after,
+html[data-theme="light"] .inspector::before { display: none; }
+html[data-theme="light"] .side-head > span:first-child::before,
+html[data-theme="light"] .ins-head::before { box-shadow: none; }
+
+/* 弹窗 / 加载更多：亮色下改成白底 */
+html[data-theme="light"] .modal-box {
+  background: #fff;
+  border-color: var(--border);
+  box-shadow: 0 20px 50px rgba(20, 40, 70, .22);
+}
+html[data-theme="light"] .loadmore {
+  background: #fff;
+  border-top-color: var(--border);
+}
+html[data-theme="light"] .loadmore:hover { background: var(--hover); }
+html[data-theme="light"] .btn { background: #fff; }
+html[data-theme="light"] .btn:hover { background: rgba(3, 105, 161, .09); box-shadow: none; }
+html[data-theme="light"] .search,
+html[data-theme="light"] .sel,
+html[data-theme="light"] .chip { background: #fff; }
+html[data-theme="light"] .search:focus-within { box-shadow: 0 0 0 3px rgba(3, 105, 161, .12); }
+html[data-theme="light"] .logo { box-shadow: 0 2px 8px rgba(146, 64, 14, .28); }
+
 /* 尊重系统的"减少动态效果"设置 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -1392,6 +1622,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb {
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
   }
+  .fx-orbs, .fx-scan { display: none; }
 }
 
 @media (max-width: 1360px) {
