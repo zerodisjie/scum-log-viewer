@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/zerodisjie/scum-log-viewer)](https://github.com/zerodisjie/scum-log-viewer/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 
-版本 **v0.1.4**（本地运行，零第三方依赖，Python 3.9+）
+版本 **v0.1.9**（本地运行，零第三方依赖，Python 3.9+）
 
 本地跑的 SCUM 服务器日志阅读工具。双击启动，浏览器里看，不用装任何第三方库。
 
@@ -13,6 +13,16 @@
 ```
 
 打包好的免安装版：[Releases](https://github.com/zerodisjie/scum-log-viewer/releases/latest) 里下载 `SCUMLogViewer-*.zip`，解压双击 `start.bat` 就能看。
+
+## 界面预览
+
+| 服务器总览 | 经济交易 |
+|---|---|
+| ![服务器总览](docs/overview.png) | ![经济交易](docs/economy.png) |
+| **登录登出** | **击杀** |
+| ![登录登出](docs/login.png) | ![击杀](docs/kill.png) |
+
+> 截图里的 SteamID / IP 已做遮盖处理。
 
 ---
 
@@ -180,7 +190,7 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 | `app.py` | 后端：本地 HTTP 服务 + 日志解析引擎 |
 | `web/` | 前端界面（原生 HTML/CSS/JS，无构建） |
 | `启动日志查看器.bat` | 一键启动 |
-| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.4.zip`） |
+| `build.py` | 打包发行版（`python build.py` → `dist/SCUMLogViewer-0.1.9.zip`） |
 | `Logs/` | 你自己的日志目录（不在仓库里，也不会上传） |
 
 上次打开的日志目录存在 `%LOCALAPPDATA%\SCUMLogViewer\config.json`，**不在程序目录里**——所以换一个版本解压到新文件夹，打开后仍然接着上次的目录和标签页，不用重新选。想清空就删这个文件。
@@ -201,9 +211,9 @@ http://127.0.0.1:8787/?type=login :: 直接打开某一类的合并视图（all 
 
 ---
 
-## 部署到服务器（v0.1.4）
+## 部署到服务器
 
-发行包 `SCUMLogViewer-0.1.4.zip` 解压即用，不需要 pip install：
+发行包 `SCUMLogViewer-0.1.9.zip` 解压即用，不需要 pip install：
 
 | 文件 | 用途 |
 |---|---|
