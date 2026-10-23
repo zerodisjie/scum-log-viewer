@@ -19,8 +19,12 @@
 | 服务器总览 | 经济交易 |
 |---|---|
 | ![服务器总览](docs/overview.png) | ![经济交易](docs/economy.png) |
-| **登录登出** | **击杀** |
-| ![登录登出](docs/login.png) | ![击杀](docs/kill.png) |
+| **登录登出** | **玩家记录** |
+| ![登录登出](docs/login.png) | ![玩家记录](docs/gameplay.png) |
+
+**亮色主题**（右上角 ◐ 一键切换，或链接加 `?theme=light`）：
+
+![亮色主题](docs/overview-light.png)
 
 > 截图里的 SteamID / IP 已做遮盖处理。
 
